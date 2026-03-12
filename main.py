@@ -31,6 +31,35 @@ VERSION_JSON = "version.json"
 # File name helpers
 # ============================================================
 
+def rename_excel_after_put(
+    input_excel: Path,
+    product_name: str,
+    new_version: str,
+    logger=None,
+) -> None:
+    """
+    Rename Excel file after successful PUT if version changed.
+
+    Example:
+        S2T_USL_TEST_v1.2.xlsx -> S2T_USL_TEST_v1.3.xlsx
+    """
+    expected_name = build_excel_filename(product_name, new_version)
+    new_path = input_excel.with_name(expected_name)
+
+    if input_excel == new_path:
+        return
+
+    try:
+        input_excel.rename(new_path)
+
+        if logger:
+            logger(f"Excel renamed: {new_path}")
+
+    except Exception as exc:
+        if logger:
+            logger(f"Failed to rename Excel file: {exc}")
+
+
 def build_excel_filename(product_name: str, version: str) -> str:
     """
     Build standard Excel file name for normal export.
@@ -521,6 +550,13 @@ def handle_put(
         logger("Committing and pushing changes...")
 
     commit_and_push(repo_dir=repo_dir, branch=branch, message=commit_message, logger=logger)
+
+    rename_excel_after_put(
+        input_excel=input_excel,
+        product_name=product_name,
+        new_version=new_version,
+        logger=logger,
+    )
 
     if logger:
         logger(f"Repo updated: {repo_dir}")
