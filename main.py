@@ -446,6 +446,9 @@ def handle_put(
 ) -> None:
     """
     Parse Excel into repo structure, update version, commit and push.
+
+    Version is bumped only if real content changes are detected.
+    If the only potential change would be version.json itself, nothing is committed.
     """
     branch = resolve_branch(config, branch_arg)
     base_branch = str(config.get("default_branch", "master")).strip()
@@ -475,16 +478,6 @@ def handle_put(
 
     if logger:
         logger(f"Reading Excel: {input_excel}")
-
-    # Resolve new version before cleaning repo data.
-    new_version = resolve_put_version(
-        version_arg=version_arg,
-        input_excel=input_excel,
-        product_name=product_name,
-        version_path=version_path,
-    )
-
-    if logger:
         logger("Clearing repo data directory...")
 
     # Remove previous generated artifacts so deletions from Excel are reflected in git.
@@ -496,6 +489,24 @@ def handle_put(
     export_excel_to_repo(
         excel_path=str(input_excel),
         output_dir=str(repo_data_dir),
+    )
+
+    version_rel_path = version_path.relative_to(repo_dir)
+
+    # If there are no real content changes (excluding version.json), do nothing.
+    if not has_changes_excluding(repo_dir, excluded_paths=[version_rel_path]):
+        if logger:
+            logger("No content changes detected. Version was not bumped.")
+            logger("Nothing to commit.")
+        print("No content changes detected. Nothing to commit.")
+        return
+
+    # Only now resolve and write new version.
+    new_version = resolve_put_version(
+        version_arg=version_arg,
+        input_excel=input_excel,
+        product_name=product_name,
+        version_path=version_path,
     )
 
     write_repo_version(version_path, new_version)
