@@ -8,7 +8,13 @@ from pathlib import Path
 from typing import Any
 
 from common import load_json_resource, read_json_file, write_json_file
-from git_repo import clear_directory_contents, commit_and_push, ensure_repo, export_commit_tree
+from git_repo import (
+    clear_directory_contents,
+    commit_and_push,
+    ensure_repo,
+    export_commit_tree,
+    has_changes_excluding,
+)
 from reader import export_excel_to_repo
 from writer import build_excel_from_repo
 
@@ -128,14 +134,14 @@ def branch_prefix_from_default(default_branch: str) -> str:
 
 def normalize_branch_name(branch: str, default_branch: str) -> str:
     """
-    Normalize branch name using prefix from configured default branch.
+    Normalize branch name using namespace rules from configured default branch.
 
     Rules:
     - if branch is empty -> use default_branch
     - if default_branch has prefix like 's2t/', then:
-        - 'master'      -> 's2t/master'
-        - 'test'        -> 's2t/test'
-        - 's2t/test'    -> 's2t/test'
+        - 'master'       -> 's2t/master'
+        - 'test'         -> 's2t/test'
+        - 's2t/test'     -> 's2t/test'
         - 'feature/test' -> error
     - if default_branch has no prefix, return branch as is
     """
@@ -145,7 +151,7 @@ def normalize_branch_name(branch: str, default_branch: str) -> str:
 
     prefix = branch_prefix_from_default(default_branch)
 
-    # No namespace prefix in default branch -> nothing special to enforce.
+    # No namespace in default branch -> no special restrictions.
     if not prefix:
         return value
 
@@ -153,7 +159,7 @@ def normalize_branch_name(branch: str, default_branch: str) -> str:
     if value.startswith(prefix):
         return value
 
-    # Any slash with another prefix is forbidden.
+    # Any other prefixed branch is forbidden.
     if "/" in value:
         raise ValueError(
             f"Branch '{value}' is not allowed. "
@@ -356,6 +362,7 @@ def handle_get(
     branch_arg: str | None,
     diff_commit_arg: str | None,
     config: dict[str, Any],
+    logger=None,
 ) -> None:
     """
     Download/refresh repo, build Excel and save it locally.
@@ -363,11 +370,15 @@ def handle_get(
     If diff_commit_arg is provided, build diff Excel against the given commit.
     """
     branch = resolve_branch(config, branch_arg)
-    base_branch = config.get("default_branch", "s2t/master")
+    base_branch = str(config.get("default_branch", "master")).strip()
     repo_url = resolve_repo_url(config, product_name)
     repo_dir = resolve_repo_dir(config, product_name)
 
-    ensure_repo(repo_url, repo_dir, branch, base_branch)
+    if logger:
+        logger(f"Preparing repository: {repo_url}")
+        logger(f"Branch: {branch}")
+
+    ensure_repo(repo_url, repo_dir, branch, base_branch, logger=logger)
 
     repo_data_dir = resolve_repo_data_dir(config, repo_dir)
     version_path = repo_data_dir / VERSION_JSON
@@ -384,6 +395,9 @@ def handle_get(
     writer_config = resolve_writer_config(config)
 
     if diff_commit_arg:
+        if logger:
+            logger(f"Exporting diff tree from commit: {diff_commit_arg}")
+
         with tempfile.TemporaryDirectory(prefix="s2t_diff_") as temp_dir:
             export_commit_tree(
                 repo_dir=repo_dir,
@@ -393,6 +407,9 @@ def handle_get(
 
             diff_repo_dir = str(resolve_repo_data_dir(config, Path(temp_dir)))
 
+            if logger:
+                logger("Building Excel with diff highlighting...")
+
             build_excel_from_repo(
                 repo_dir=str(repo_data_dir),
                 output_excel_path=str(output_excel),
@@ -401,6 +418,9 @@ def handle_get(
                 diff_commit=diff_commit_arg,
             )
     else:
+        if logger:
+            logger("Building Excel file...")
+
         build_excel_from_repo(
             repo_dir=str(repo_data_dir),
             output_excel_path=str(output_excel),
@@ -408,6 +428,9 @@ def handle_get(
             diff_repo_dir=None,
             diff_commit=None,
         )
+
+    if logger:
+        logger(f"Excel created: {output_excel}")
 
     print(f"Excel created: {output_excel}")
 
@@ -419,16 +442,21 @@ def handle_put(
     excel_arg: str | None,
     commit_message_arg: str | None,
     config: dict[str, Any],
+    logger=None,
 ) -> None:
     """
     Parse Excel into repo structure, update version, commit and push.
     """
     branch = resolve_branch(config, branch_arg)
-    base_branch = config.get("default_branch", "s2t/master")
+    base_branch = str(config.get("default_branch", "master")).strip()
     repo_url = resolve_repo_url(config, product_name)
     repo_dir = resolve_repo_dir(config, product_name)
 
-    ensure_repo(repo_url, repo_dir, branch, base_branch)
+    if logger:
+        logger(f"Preparing repository: {repo_url}")
+        logger(f"Branch: {branch}")
+
+    ensure_repo(repo_url, repo_dir, branch, base_branch, logger=logger)
 
     repo_data_dir = resolve_repo_data_dir(config, repo_dir)
     version_path = repo_data_dir / VERSION_JSON
@@ -445,6 +473,9 @@ def handle_put(
 
     ensure_not_diff_excel(input_excel)
 
+    if logger:
+        logger(f"Reading Excel: {input_excel}")
+
     # Resolve new version before cleaning repo data.
     new_version = resolve_put_version(
         version_arg=version_arg,
@@ -453,8 +484,14 @@ def handle_put(
         version_path=version_path,
     )
 
+    if logger:
+        logger("Clearing repo data directory...")
+
     # Remove previous generated artifacts so deletions from Excel are reflected in git.
     clear_directory_contents(repo_data_dir)
+
+    if logger:
+        logger("Exporting Excel into repo structure...")
 
     export_excel_to_repo(
         excel_path=str(input_excel),
@@ -469,7 +506,14 @@ def handle_put(
         else f"Update S2T for {product_name} to version {new_version}"
     )
 
-    commit_and_push(repo_dir=repo_dir, branch=branch, message=commit_message)
+    if logger:
+        logger("Committing and pushing changes...")
+
+    commit_and_push(repo_dir=repo_dir, branch=branch, message=commit_message, logger=logger)
+
+    if logger:
+        logger(f"Repo updated: {repo_dir}")
+        logger(f"New version: {new_version}")
 
     print(f"Repo updated: {repo_dir}")
     print(f"New version: {new_version}")
@@ -517,6 +561,7 @@ def main() -> None:
             branch_arg=args.branch,
             diff_commit_arg=args.diff_commit,
             config=config,
+            logger=None,
         )
     elif args.command == "put":
         handle_put(
@@ -526,6 +571,7 @@ def main() -> None:
             excel_arg=args.excel,
             commit_message_arg=args.message,
             config=config,
+            logger=None,
         )
 
 

@@ -11,28 +11,43 @@ from pathlib import Path
 # Low-level git helpers
 # ============================================================
 
-def run_git(args: list[str], cwd: Path | None = None) -> str:
+def run_git(args: list[str], cwd: Path | None = None, log=None) -> str:
     """
-    Execute git command and return stdout as stripped text.
+    Execute git command and return collected output.
 
-    Raises RuntimeError if git exits with non-zero code.
+    If `log` callback is provided, stream git output line-by-line to it.
     """
     cmd = ["git"] + args
-    result = subprocess.run(
+
+    process = subprocess.Popen(
         cmd,
         cwd=cwd,
-        capture_output=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
         text=True,
+        bufsize=1,
     )
 
-    if result.returncode != 0:
+    output_lines: list[str] = []
+
+    assert process.stdout is not None
+
+    for line in process.stdout:
+        line = line.rstrip()
+        output_lines.append(line)
+
+        if log:
+            log(line)
+
+    process.wait()
+
+    if process.returncode != 0:
         raise RuntimeError(
             f"Git command failed: {' '.join(cmd)}\n"
-            f"stdout:\n{result.stdout}\n"
-            f"stderr:\n{result.stderr}"
+            + "\n".join(output_lines)
         )
 
-    return result.stdout.strip()
+    return "\n".join(output_lines)
 
 
 def remote_branch_exists(repo_url: str, branch: str) -> bool:
@@ -112,10 +127,22 @@ def clear_worktree_except_git(repo_dir: Path) -> None:
 
 
 # ============================================================
+# Sync helpers
+# ============================================================
+
+def reset_and_clean_to_remote(repo_dir: Path, branch: str, logger=None) -> None:
+    """
+    Reset local working tree to exact remote branch state and remove untracked files.
+    """
+    run_git(["reset", "--hard", f"origin/{branch}"], cwd=repo_dir, log=logger)
+    run_git(["clean", "-fd"], cwd=repo_dir, log=logger)
+
+
+# ============================================================
 # Branch creation / switching logic
 # ============================================================
 
-def create_orphan_branch(repo_dir: Path, branch: str) -> None:
+def create_orphan_branch(repo_dir: Path, branch: str, logger=None) -> None:
     """
     Recreate branch as orphan.
 
@@ -124,19 +151,19 @@ def create_orphan_branch(repo_dir: Path, branch: str) -> None:
     """
     # If branch already exists locally, delete it first.
     if local_branch_exists(repo_dir, branch):
-        current_branch = run_git(["branch", "--show-current"], cwd=repo_dir)
+        current_branch = run_git(["branch", "--show-current"], cwd=repo_dir, log=logger)
         if current_branch == branch:
             # Move away from branch before deleting it.
-            run_git(["switch", "--detach"], cwd=repo_dir)
-        run_git(["branch", "-D", branch], cwd=repo_dir)
+            run_git(["switch", "--detach"], cwd=repo_dir, log=logger)
+        run_git(["branch", "-D", branch], cwd=repo_dir, log=logger)
 
     # Create orphan branch.
-    run_git(["switch", "--orphan", branch], cwd=repo_dir)
+    run_git(["switch", "--orphan", branch], cwd=repo_dir, log=logger)
 
     # Remove tracked files from index if index is not empty.
     # In a completely empty repo this may fail, so ignore it.
     try:
-        run_git(["rm", "-rf", "--cached", "."], cwd=repo_dir)
+        run_git(["rm", "-rf", "--cached", "."], cwd=repo_dir, log=logger)
     except RuntimeError:
         pass
 
@@ -144,7 +171,7 @@ def create_orphan_branch(repo_dir: Path, branch: str) -> None:
     clear_worktree_except_git(repo_dir)
 
 
-def create_branch_from_base(repo_dir: Path, branch: str, base_branch: str) -> None:
+def create_branch_from_base(repo_dir: Path, branch: str, base_branch: str, logger=None) -> None:
     """
     Create a new local branch from base_branch.
 
@@ -158,28 +185,28 @@ def create_branch_from_base(repo_dir: Path, branch: str, base_branch: str) -> No
 
     # Switch to local base branch if present, otherwise create local tracking branch.
     if local_branch_exists(repo_dir, base_branch):
-        run_git(["switch", base_branch], cwd=repo_dir)
+        run_git(["switch", base_branch], cwd=repo_dir, log=logger)
     else:
-        run_git(["switch", "-c", base_branch, f"origin/{base_branch}"], cwd=repo_dir)
+        run_git(["switch", "-c", base_branch, f"origin/{base_branch}"], cwd=repo_dir, log=logger)
 
     # Make sure base branch content matches remote exactly.
-    reset_and_clean_to_remote(repo_dir, base_branch)
+    reset_and_clean_to_remote(repo_dir, base_branch, logger)
 
     # If branch somehow exists locally, recreate it cleanly.
     if local_branch_exists(repo_dir, branch):
-        current_branch = run_git(["branch", "--show-current"], cwd=repo_dir)
+        current_branch = run_git(["branch", "--show-current"], cwd=repo_dir, log=logger)
         if current_branch == branch:
-            run_git(["switch", "--detach"], cwd=repo_dir)
-        run_git(["branch", "-D", branch], cwd=repo_dir)
+            run_git(["switch", "--detach"], cwd=repo_dir, log=logger)
+        run_git(["branch", "-D", branch], cwd=repo_dir, log=logger)
 
-    run_git(["switch", "-c", branch], cwd=repo_dir)
+    run_git(["switch", "-c", branch], cwd=repo_dir, log=logger)
 
 
 # ============================================================
 # Clone / sync logic
 # ============================================================
 
-def clone_repo(repo_url: str, target_dir: Path, branch: str, base_branch: str) -> None:
+def clone_repo(repo_url: str, target_dir: Path, branch: str, base_branch: str, logger=None) -> None:
     """
     Clone repository into target_dir and prepare requested branch.
 
@@ -190,14 +217,14 @@ def clone_repo(repo_url: str, target_dir: Path, branch: str, base_branch: str) -
         - otherwise create target branch from existing base_branch
     """
     if remote_branch_exists(repo_url, branch):
-        run_git(["clone", "--branch", branch, repo_url, str(target_dir)])
+        run_git(["clone", "--branch", branch, repo_url, str(target_dir)], log=logger)
         return
 
     # If we are creating the base branch itself and it does not exist,
     # create it as orphan.
     if branch == base_branch:
-        run_git(["clone", repo_url, str(target_dir)])
-        create_orphan_branch(target_dir, branch)
+        run_git(["clone", repo_url, str(target_dir)], log=logger)
+        create_orphan_branch(target_dir, branch, logger)
         return
 
     # Otherwise base branch must exist.
@@ -208,11 +235,11 @@ def clone_repo(repo_url: str, target_dir: Path, branch: str, base_branch: str) -
         )
 
     # Clone from base branch and then create new branch from it.
-    run_git(["clone", "--branch", base_branch, repo_url, str(target_dir)])
-    create_branch_from_base(target_dir, branch, base_branch)
+    run_git(["clone", "--branch", base_branch, repo_url, str(target_dir)], log=logger)
+    create_branch_from_base(target_dir, branch, base_branch, logger)
 
 
-def hard_reset_to_remote(repo_dir: Path, branch: str, base_branch: str) -> None:
+def hard_reset_to_remote(repo_dir: Path, branch: str, base_branch: str, logger=None) -> None:
     """
     Bring already cloned repo to clean state.
 
@@ -222,43 +249,35 @@ def hard_reset_to_remote(repo_dir: Path, branch: str, base_branch: str) -> None:
         - if target branch == base_branch -> create orphan branch
         - otherwise create branch from base_branch
     """
-    run_git(["fetch", "origin"], cwd=repo_dir)
+    run_git(["fetch", "origin"], cwd=repo_dir, log=logger)
 
     # Branch exists in remote -> sync local branch to remote state.
     if local_remote_branch_exists(repo_dir, branch):
         if local_branch_exists(repo_dir, branch):
-            run_git(["switch", branch], cwd=repo_dir)
+            run_git(["switch", branch], cwd=repo_dir, log=logger)
         else:
-            run_git(["switch", "-c", branch, f"origin/{branch}"], cwd=repo_dir)
+            run_git(["switch", "-c", branch, f"origin/{branch}"], cwd=repo_dir, log=logger)
 
-        reset_and_clean_to_remote(repo_dir, branch)
+        reset_and_clean_to_remote(repo_dir, branch, logger)
         return
 
     # Branch does not exist remotely.
     if branch == base_branch:
-        create_orphan_branch(repo_dir, branch)
+        create_orphan_branch(repo_dir, branch, logger)
         return
 
-    create_branch_from_base(repo_dir, branch, base_branch)
+    create_branch_from_base(repo_dir, branch, base_branch, logger)
 
 
-def ensure_repo(repo_url: str, repo_dir: Path, branch: str, base_branch: str) -> None:
+def ensure_repo(repo_url: str, repo_dir: Path, branch: str, base_branch: str, logger=None) -> None:
     """
     Ensure local repo exists and is prepared on requested branch.
     """
     if not repo_dir.exists():
         repo_dir.parent.mkdir(parents=True, exist_ok=True)
-        clone_repo(repo_url, repo_dir, branch, base_branch)
+        clone_repo(repo_url, repo_dir, branch, base_branch, logger)
     else:
-        hard_reset_to_remote(repo_dir, branch, base_branch)
-
-
-def reset_and_clean_to_remote(repo_dir: Path, branch: str) -> None:
-    """
-    Reset local working tree to exact remote branch state and remove untracked files.
-    """
-    run_git(["reset", "--hard", f"origin/{branch}"], cwd=repo_dir)
-    run_git(["clean", "-fd"], cwd=repo_dir)
+        hard_reset_to_remote(repo_dir, branch, base_branch, logger)
 
 
 # ============================================================
@@ -278,31 +297,83 @@ def has_changes(repo_dir: Path) -> bool:
     return bool(result.stdout.strip())
 
 
-def commit_all(repo_dir: Path, message: str) -> None:
+def has_changes_excluding(repo_dir: Path, excluded_paths: list[Path] | None = None) -> bool:
+    """
+    Return True if repo has changes excluding selected repo-relative paths.
+    """
+    excluded_rel = {
+        str(path).replace("\\", "/").lstrip("./")
+        for path in (excluded_paths or [])
+    }
+
+    result = subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=repo_dir,
+        capture_output=True,
+        text=True,
+    )
+
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"Git status failed in {repo_dir}\n"
+            f"stdout:\n{result.stdout}\n"
+            f"stderr:\n{result.stderr}"
+        )
+
+    for line in result.stdout.splitlines():
+        if not line.strip():
+            continue
+
+        # формат porcelain: "XY path"
+        path_text = line[3:].strip().replace("\\", "/")
+
+        # для rename строк формат может быть "old -> new"
+        if " -> " in path_text:
+            old_path, new_path = path_text.split(" -> ", 1)
+            old_path = old_path.strip()
+            new_path = new_path.strip()
+
+            if old_path in excluded_rel and new_path in excluded_rel:
+                continue
+
+            return True
+
+        if path_text in excluded_rel:
+            continue
+
+        return True
+
+    return False
+
+
+def commit_all(repo_dir: Path, message: str, logger=None) -> None:
     """
     Stage all changes (including deletions) and create commit.
     """
-    run_git(["add", "-A"], cwd=repo_dir)
-    run_git(["commit", "-m", message], cwd=repo_dir)
+    run_git(["add", "-A"], cwd=repo_dir, log=logger)
+    run_git(["commit", "-m", message], cwd=repo_dir, log=logger)
 
 
-def push(repo_dir: Path, branch: str) -> None:
+def push(repo_dir: Path, branch: str, logger=None) -> None:
     """
     Push current branch to origin and set upstream if needed.
     """
-    run_git(["push", "-u", "origin", branch], cwd=repo_dir)
+    run_git(["push", "-u", "origin", branch], cwd=repo_dir, log=logger)
 
 
-def commit_and_push(repo_dir: Path, branch: str, message: str) -> None:
+def commit_and_push(repo_dir: Path, branch: str, message: str, logger=None) -> None:
     """
     Commit and push repo only if there are changes.
     """
     if not has_changes(repo_dir):
-        print("No changes to commit")
+        if logger:
+            logger("No changes to commit")
+        else:
+            print("No changes to commit")
         return
 
-    commit_all(repo_dir, message)
-    push(repo_dir, branch)
+    commit_all(repo_dir, message, logger)
+    push(repo_dir, branch, logger)
 
 
 # ============================================================
