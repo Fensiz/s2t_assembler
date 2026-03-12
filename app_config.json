@@ -1,0 +1,8 @@
+{
+  "repo_base_url": "git@github.com:Fensiz",
+  "default_branch": "s2t/master",
+  "workspace_dir": "~/.s2t",
+  "excel_output_dir": ".",
+  "writer_config": "writer_config.json",
+  "repo_data_subdir": "resources/s2t"
+}

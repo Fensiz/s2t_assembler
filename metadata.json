@@ -1,0 +1,72 @@
+{
+  "blocks": [
+    {
+      "type": "header_with_link",
+      "title_en": "Rules for filling out the document",
+      "title_ru": "Правила заполнения документа:",
+      "link": "https://confluence.sberbank.ru/pages/viewpage.action?pageId=3688926346"
+    },
+    {
+      "type": "table",
+      "title_en": "Data-product information",
+      "title_ru": null,
+      "table": {
+        "headers": ["Value name", "Value"],
+        "rows": [
+          ["Основная схема", ""],
+          ["Dialect S2T", "H-SQL"],
+          ["Версия файла с описанием данных справочников", ""]
+        ]
+      }
+    },
+    {
+      "type": "text_with_table",
+      "title_en": "Rules for generating business history",
+      "title_ru": "Правила формирования бизнес-истории",
+      "table": {
+        "headers": ["Value", "Description"],
+        "rows": [
+          ["LOAD", "By load date into USL"],
+          ["BUS", "By business date from a source"],
+          ["PERIOD", "By period from a source"],
+          ["TECH", "Technical history"]
+        ]
+      }
+    },
+    {
+      "type": "text_with_table",
+      "title_en": "Settings table",
+      "title_ru": "Настроечная таблица",
+      "table": {
+        "headers": ["Value", "Description"],
+        "rows": [
+          ["ST_FILTER", "Настройка фильтров"],
+          ["ST_DECODER", "Настройка соответствий"]
+        ]
+      }
+    },
+    {
+      "type": "text_with_table",
+      "title_en": "LG key type",
+      "title_ru": "Вид ключа в ЛГ источника",
+      "table": {
+        "headers": ["Value", "Description"],
+        "rows": [
+          ["PK", "Первичный ключ"],
+          ["FK", "Внешний ключ"],
+          ["", "Пусто"]
+        ]
+      }
+    },
+    {
+      "type": "text_with_table",
+      "title_en": "S2T template version",
+      "title_ru": "Версия шаблона S2t",
+      "table": {
+        "rows": [
+          ["3.0"]
+        ]
+      }
+    }
+  ]
+}
