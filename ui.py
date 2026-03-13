@@ -161,6 +161,18 @@ def open_file_in_os(path: Path) -> None:
         subprocess.run(["xdg-open", str(path)], check=True)
 
 
+def open_directory_in_os(path: Path) -> None:
+    """
+    Open directory in the OS file manager.
+    """
+    if sys.platform.startswith("win"):
+        os.startfile(str(path))  # type: ignore[attr-defined]
+    elif sys.platform == "darwin":
+        subprocess.run(["open", str(path)], check=True)
+    else:
+        subprocess.run(["xdg-open", str(path)], check=True)
+
+
 def resolve_branch_value(branch_text: str) -> str | None:
     """
     Convert UI branch text to optional value.
@@ -204,6 +216,7 @@ def main_ui() -> None:
     Main Tkinter UI entry point.
     """
     config = load_app_config()
+    workspace_dir = Path(config.get("workspace_dir", "~/.")).expanduser().resolve()
 
     root = tk.Tk()
     root.title("S2T Tool")
@@ -333,6 +346,21 @@ def main_ui() -> None:
     # Actions
     # --------------------------------------------------------
 
+    def run_open_s2t_folder() -> None:
+        """
+        Open directory where S2T Excel files are created.
+        This is the current working directory where the tool was launched.
+        """
+        try:
+            folder = Path.cwd()
+            open_directory_in_os(folder)
+            append_status(status_text, f"Opened folder: {folder}")
+        except Exception as exc:
+            error_text = str(exc)
+            set_status(status_text, f"Open folder failed:\n{error_text}")
+            messagebox.showerror("Open folder failed", error_text)
+
+
     def run_get() -> None:
         """
         Start GET operation in background thread.
@@ -454,6 +482,7 @@ def main_ui() -> None:
 
     tk.Button(button_frame, text="Get", width=12, command=run_get).pack(side="left")
     tk.Button(button_frame, text="Put", width=12, command=run_put).pack(side="left", padx=(10, 0))
+    tk.Button(button_frame, text="Open S2T folder", width=16, command=run_open_s2t_folder).pack(side="left", padx=(10, 0))
 
     root.mainloop()
 
