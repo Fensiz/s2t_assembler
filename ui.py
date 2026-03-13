@@ -316,6 +316,16 @@ def main_ui() -> None:
         """
         root.after(0, lambda msg=line: append_status(status_text, msg))
 
+
+    def set_buttons_enabled(enabled: bool) -> None:
+        """
+        Enable or disable action buttons during background operations.
+        """
+        state = "normal" if enabled else "disabled"
+        get_button.config(state=state)
+        put_button.config(state=state)
+
+
     def on_recent_select(event) -> None:
         """
         Fill form fields from selected recent item.
@@ -430,7 +440,10 @@ def main_ui() -> None:
                 error_text = str(exc)
                 root.after(0, lambda msg=error_text: set_status(status_text, f"GET failed:\n{msg}"))
                 root.after(0, lambda msg=error_text: messagebox.showerror("GET failed", msg))
+            finally:
+                root.after(0, lambda: set_buttons_enabled(True))
 
+        set_buttons_enabled(False)
         run_in_thread(worker)
 
     def run_put() -> None:
@@ -473,15 +486,22 @@ def main_ui() -> None:
                 error_text = str(exc)
                 root.after(0, lambda msg=error_text: set_status(status_text, f"PUT failed:\n{msg}"))
                 root.after(0, lambda msg=error_text: messagebox.showerror("PUT failed", msg))
+            finally:
+                root.after(0, lambda: set_buttons_enabled(True))
 
+        set_buttons_enabled(False)
         run_in_thread(worker)
 
     # --------------------------------------------------------
     # Buttons wiring
     # --------------------------------------------------------
 
-    tk.Button(button_frame, text="Get", width=12, command=run_get).pack(side="left")
-    tk.Button(button_frame, text="Put", width=12, command=run_put).pack(side="left", padx=(10, 0))
+    get_button = tk.Button(button_frame, text="Get", width=12, command=run_get)
+    get_button.pack(side="left")
+
+    put_button = tk.Button(button_frame, text="Put", width=12, command=run_put)
+    put_button.pack(side="left", padx=(10, 0))
+
     tk.Button(button_frame, text="Open S2T folder", width=16, command=run_open_s2t_folder).pack(side="left", padx=(10, 0))
 
     root.mainloop()
