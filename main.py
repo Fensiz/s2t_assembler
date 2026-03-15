@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from typing import Any
 
 from main_config import load_app_config
 from main_models import GetCommand, PutCommand
@@ -13,7 +14,7 @@ def handle_get(
     product_name: str,
     branch_arg: str | None,
     diff_commit_arg: str | None,
-    config: dict,
+    config: dict[str, Any],
     logger=None,
 ) -> None:
     _service.handle_get(
@@ -33,7 +34,7 @@ def handle_put(
     version_arg: str | None,
     excel_arg: str | None,
     commit_message_arg: str | None,
-    config: dict,
+    config: dict[str, Any],
     logger=None,
 ) -> None:
     _service.handle_put(
@@ -49,13 +50,9 @@ def handle_put(
     )
 
 
-def main() -> None:
+def build_parser() -> argparse.ArgumentParser:
     """
-    CLI entry point.
-
-    Commands:
-        get <product_name>
-        put <product_name>
+    Build CLI argument parser.
     """
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -78,6 +75,18 @@ def main() -> None:
     put_parser.add_argument("--excel", default=None)
     put_parser.add_argument("--message", default=None)
 
+    return parser
+
+
+def main() -> None:
+    """
+    CLI entry point.
+
+    Commands:
+        get <product_name>
+        put <product_name>
+    """
+    parser = build_parser()
     args = parser.parse_args()
     config = load_app_config(args.config)
 
