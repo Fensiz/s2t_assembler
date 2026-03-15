@@ -6,6 +6,8 @@ from main_config import load_app_config
 from main_models import GetCommand, PutCommand
 from main_service import S2TService
 
+_service = S2TService()
+
 
 def handle_get(
     product_name: str,
@@ -14,8 +16,7 @@ def handle_get(
     config: dict,
     logger=None,
 ) -> None:
-    service = S2TService()
-    service.handle_get(
+    _service.handle_get(
         GetCommand(
             product_name=product_name,
             branch_arg=branch_arg,
@@ -35,8 +36,7 @@ def handle_put(
     config: dict,
     logger=None,
 ) -> None:
-    service = S2TService()
-    service.handle_put(
+    _service.handle_put(
         PutCommand(
             product_name=product_name,
             branch_arg=branch_arg,
