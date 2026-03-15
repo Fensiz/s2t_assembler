@@ -165,6 +165,9 @@ def open_directory_in_os(path: Path) -> None:
     """
     Open directory in the OS file manager.
     """
+    if not path.exists():
+        raise FileNotFoundError(f"Directory not found: {path}")
+
     if sys.platform.startswith("win"):
         os.startfile(str(path))  # type: ignore[attr-defined]
     elif sys.platform == "darwin":
@@ -189,17 +192,43 @@ def run_in_thread(fn: Callable[[], None]) -> None:
     thread.start()
 
 
-def find_latest_excel_file(excel_dir: Path, product_name: str, diff_mode: bool) -> Path | None:
+def find_latest_excel_file(
+    excel_dir: Path,
+    product_name: str,
+    diff_mode: bool,
+) -> Path | None:
     """
     Find the newest generated Excel file for the product.
+
+    Supports:
+    - normal:      S2T_USL_<PRODUCT>_v*.xlsx
+    - debug:       S2T_USL_<PRODUCT>_v*_debug.xlsx
+    - diff:        S2T_USL_<PRODUCT>_v*_diff.xlsx
+    - debug diff:  S2T_USL_<PRODUCT>_v*_debug_diff.xlsx
     """
+    product_upper = product_name.upper()
+
     if diff_mode:
-        pattern = f"S2T_USL_{product_name.upper()}_v*_diff.xlsx"
+        patterns = [
+            f"S2T_USL_{product_upper}_v*_debug_diff.xlsx",
+            f"S2T_USL_{product_upper}_v*_diff.xlsx",
+        ]
     else:
-        pattern = f"S2T_USL_{product_name.upper()}_v*.xlsx"
+        patterns = [
+            f"S2T_USL_{product_upper}_v*_debug.xlsx",
+            f"S2T_USL_{product_upper}_v*.xlsx",
+        ]
+
+    candidates: list[Path] = []
+    for pattern in patterns:
+        candidates.extend(excel_dir.glob(pattern))
+
+    # для обычного режима исключаем diff-файлы
+    if not diff_mode:
+        candidates = [p for p in candidates if not p.name.lower().endswith("_diff.xlsx")]
 
     candidates = sorted(
-        excel_dir.glob(pattern),
+        candidates,
         key=lambda p: p.stat().st_mtime,
         reverse=True,
     )
@@ -216,7 +245,6 @@ def main_ui() -> None:
     Main Tkinter UI entry point.
     """
     config = load_app_config()
-    workspace_dir = Path(config.get("workspace_dir", "~/.")).expanduser().resolve()
 
     root = tk.Tk()
     root.title("S2T Tool")
@@ -229,7 +257,7 @@ def main_ui() -> None:
     form_container = tk.Frame(root)
     form_container.pack(fill="x", padx=10, pady=(10, 0))
 
-    # Row 1: product + branch
+    # row 1: product + branch
     row1 = tk.Frame(form_container)
     row1.pack(fill="x")
 
@@ -247,7 +275,7 @@ def main_ui() -> None:
     branch_entry = tk.Entry(branch_block, width=24)
     branch_entry.pack(fill="x")
 
-    # Row 2: commit message + version + diff commit
+    # row 2: commit message + version + diff commit
     row2 = tk.Frame(form_container)
     row2.pack(fill="x", pady=(10, 0))
 
@@ -316,15 +344,14 @@ def main_ui() -> None:
         """
         root.after(0, lambda msg=line: append_status(status_text, msg))
 
-
     def set_buttons_enabled(enabled: bool) -> None:
         """
-        Enable or disable action buttons during background operations.
+        Enable or disable main action buttons during background operations.
+        Open-folder button stays enabled.
         """
         state = "normal" if enabled else "disabled"
         get_button.config(state=state)
         put_button.config(state=state)
-
 
     def on_recent_select(event) -> None:
         """
@@ -369,7 +396,6 @@ def main_ui() -> None:
             error_text = str(exc)
             set_status(status_text, f"Open folder failed:\n{error_text}")
             messagebox.showerror("Open folder failed", error_text)
-
 
     def run_get() -> None:
         """
@@ -420,7 +446,7 @@ def main_ui() -> None:
                     0,
                     lambda: update_recent_items(product_name, branch or "", recent_listbox),
                 )
-                root.after(0, lambda: append_status(status_text, message))
+                root.after(0, lambda msg=message: append_status(status_text, msg))
 
                 if open_after_get_var.get() and downloaded_file is not None:
                     try:
@@ -479,7 +505,7 @@ def main_ui() -> None:
                 )
                 root.after(
                     0,
-                    lambda: append_status(status_text, f"PUT completed for '{product_name}'"),
+                    lambda name=product_name: append_status(status_text, f"PUT completed for '{name}'"),
                 )
 
             except Exception as exc:
@@ -502,7 +528,12 @@ def main_ui() -> None:
     put_button = tk.Button(button_frame, text="Put", width=12, command=run_put)
     put_button.pack(side="left", padx=(10, 0))
 
-    tk.Button(button_frame, text="Open S2T folder", width=16, command=run_open_s2t_folder).pack(side="left", padx=(10, 0))
+    tk.Button(
+        button_frame,
+        text="Open S2T folder",
+        width=16,
+        command=run_open_s2t_folder,
+    ).pack(side="left", padx=(10, 0))
 
     root.mainloop()
 

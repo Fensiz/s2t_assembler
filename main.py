@@ -35,6 +35,8 @@ def rename_excel_after_put(
     input_excel: Path,
     product_name: str,
     new_version: str,
+    branch: str,
+    default_branch: str,
     logger=None,
 ) -> None:
     """
@@ -42,8 +44,10 @@ def rename_excel_after_put(
 
     Example:
         S2T_USL_TEST_v1.2.xlsx -> S2T_USL_TEST_v1.3.xlsx
+        S2T_USL_TEST_v1.2_debug.xlsx -> S2T_USL_TEST_v1.3_debug.xlsx
     """
-    expected_name = build_excel_filename(product_name, new_version)
+    debug_mode = is_debug_branch(branch, default_branch)
+    expected_name = build_branch_excel_filename(product_name, new_version, debug_mode)
     new_path = input_excel.with_name(expected_name)
 
     if input_excel == new_path:
@@ -60,33 +64,47 @@ def rename_excel_after_put(
             logger(f"Failed to rename Excel file: {exc}")
 
 
-def build_excel_filename(product_name: str, version: str) -> str:
+def build_branch_excel_filename(product_name: str, version: str, debug_mode: bool) -> str:
     """
-    Build standard Excel file name for normal export.
+    Build Excel file name for normal export, with optional _debug suffix.
     """
-    return f"S2T_USL_{product_name.upper()}_v{version}.xlsx"
+    suffix = "_debug" if debug_mode else ""
+    return f"S2T_USL_{product_name.upper()}_v{version}{suffix}.xlsx"
 
 
-def build_diff_excel_filename(product_name: str, version: str) -> str:
+def build_branch_diff_excel_filename(product_name: str, version: str, debug_mode: bool) -> str:
     """
-    Build Excel file name for diff export.
+    Build Excel file name for diff export, with optional _debug suffix.
     """
-    return f"S2T_USL_{product_name.upper()}_v{version}_diff.xlsx"
+    suffix = "_debug" if debug_mode else ""
+    return f"S2T_USL_{product_name.upper()}_v{version}{suffix}_diff.xlsx"
 
 
 def parse_version_from_excel_filename(excel_path: Path, product_name: str) -> str | None:
     """
-    Extract version from file name like:
-        S2T_USL_<PRODUCT_NAME>_v1.2.3.xlsx
+    Extract version from file name.
+
+    Supported examples:
+        S2T_USL_TEST_v1.2.3.xlsx
+        S2T_USL_TEST_v1.2.3_debug.xlsx
+        S2T_USL_TEST_v1.2.3_diff.xlsx
+        S2T_USL_TEST_v1.2.3_debug_diff.xlsx
     """
     filename = excel_path.name
-    pattern = rf"^S2T_USL_{re.escape(product_name.upper())}_v(.+)\.xlsx$"
-    match = re.match(pattern, filename, flags=re.IGNORECASE)
 
+    pattern = (
+        rf"^S2T_USL_{re.escape(product_name.upper())}_v"
+        rf"(?P<version>.+?)"
+        rf"(?:_debug)?"
+        rf"(?:_diff)?"
+        rf"\.xlsx$"
+    )
+
+    match = re.match(pattern, filename, flags=re.IGNORECASE)
     if not match:
         return None
 
-    version = match.group(1).strip()
+    version = match.group("version").strip()
     return version or None
 
 
@@ -163,16 +181,19 @@ def branch_prefix_from_default(default_branch: str) -> str:
 
 def normalize_branch_name(branch: str, default_branch: str) -> str:
     """
-    Normalize branch name using namespace rules from configured default branch.
+    Normalize branch name using namespace rules derived from default_branch.
 
-    Rules:
-    - if branch is empty -> use default_branch
-    - if default_branch has prefix like 's2t/', then:
-        - 'master'       -> 's2t/master'
-        - 'test'         -> 's2t/test'
-        - 's2t/test'     -> 's2t/test'
-        - 'feature/test' -> error
-    - if default_branch has no prefix, return branch as is
+    Rules (example default_branch = "s2t/master"):
+
+        test            -> s2t/test
+        debug/develop   -> s2t/debug/develop
+        s2t/test        -> s2t/test
+        s2t/debug/x     -> s2t/debug/x
+
+    Branches starting with another namespace are forbidden:
+
+        feature/test -> error
+        hotfix/x     -> error
     """
     value = str(branch).strip()
     if not value:
@@ -180,24 +201,57 @@ def normalize_branch_name(branch: str, default_branch: str) -> str:
 
     prefix = branch_prefix_from_default(default_branch)
 
-    # No namespace in default branch -> no special restrictions.
+    # No namespace restriction
     if not prefix:
         return value
 
-    # Already in allowed namespace.
+    # Already valid namespace
     if value.startswith(prefix):
         return value
 
-    # Any other prefixed branch is forbidden.
-    if "/" in value:
+    # If branch starts with another namespace (feature/, hotfix/, etc)
+    if "/" in value and not value.startswith("debug/"):
         raise ValueError(
             f"Branch '{value}' is not allowed. "
             f"Allowed branch names must start with '{prefix}' "
-            f"or be short names without '/'."
+            f"or be inside namespace '{prefix}debug/'."
         )
 
-    # Short name -> expand into configured namespace.
+    # Short name or debug/... branch → expand namespace
     return f"{prefix}{value}"
+
+
+def branch_tail(branch: str, default_branch: str) -> str:
+    """
+    Return branch tail after configured namespace prefix.
+
+    Example:
+        default_branch = "s2t/master"
+        branch = "s2t/debug/test" -> "debug/test"
+        branch = "s2t/test"       -> "test"
+    """
+    prefix = branch_prefix_from_default(default_branch)
+    value = str(branch).strip()
+
+    if prefix and value.startswith(prefix):
+        return value[len(prefix):]
+
+    return value
+
+
+def is_debug_branch(branch: str, default_branch: str) -> bool:
+    """
+    Return True only if debug is the second prefix after base namespace.
+
+    Example for default_branch = "s2t/master":
+        s2t/debug/test -> True
+        s2t/test       -> False
+        s2t/debug      -> False
+        debug/test     -> False
+        debug          -> False
+    """
+    tail = branch_tail(branch, default_branch).strip().lower()
+    return tail.startswith("debug/")
 
 
 def resolve_branch(config: dict[str, Any], branch_arg: str | None) -> str:
@@ -262,13 +316,19 @@ def find_default_excel_path(
     config: dict[str, Any],
     product_name: str,
     version: str,
+    branch: str | None = None,
 ) -> Path:
     """
     Build output path for regular GET operation.
     """
     output_dir = resolve_excel_output_dir(config)
     ensure_excel_output_dir(output_dir)
-    return output_dir / build_excel_filename(product_name, version)
+
+    default_branch = str(config.get("default_branch", "master")).strip()
+    resolved_branch = branch or default_branch
+    debug_mode = is_debug_branch(resolved_branch, default_branch)
+
+    return output_dir / build_branch_excel_filename(product_name, version, debug_mode)
 
 
 # ============================================================
@@ -349,6 +409,7 @@ def resolve_input_excel_path(
     product_name: str,
     explicit_excel: str | None,
     explicit_version: str | None,
+    branch: str | None = None,
 ) -> Path:
     """
     Resolve Excel file to use for PUT.
@@ -357,18 +418,30 @@ def resolve_input_excel_path(
     1. explicit --excel path
     2. generated name from --version
     3. latest matching file in configured Excel output directory
+
+    File name selection respects debug-mode derived from branch name.
     """
     if explicit_excel:
         return Path(explicit_excel).expanduser().resolve()
 
     excel_dir = resolve_excel_output_dir(config)
+    default_branch = str(config.get("default_branch", "master")).strip()
+    resolved_branch = branch or default_branch
+    debug_mode = is_debug_branch(resolved_branch, default_branch)
 
     if explicit_version is not None:
-        return excel_dir / build_excel_filename(product_name, explicit_version)
+        return excel_dir / build_branch_excel_filename(product_name, explicit_version, debug_mode)
 
-    pattern = f"S2T_USL_{product_name.upper()}_v*.xlsx"
+    if debug_mode:
+        pattern = f"S2T_USL_{product_name.upper()}_v*_debug.xlsx"
+    else:
+        pattern = f"S2T_USL_{product_name.upper()}_v*.xlsx"
+
     candidates = sorted(
-        excel_dir.glob(pattern),
+        [
+            p for p in excel_dir.glob(pattern)
+            if not p.name.lower().endswith("_diff.xlsx")
+        ],
         key=lambda p: p.stat().st_mtime,
         reverse=True,
     )
@@ -400,6 +473,7 @@ def handle_get(
     """
     branch = resolve_branch(config, branch_arg)
     base_branch = str(config.get("default_branch", "master")).strip()
+    debug_mode = is_debug_branch(branch, base_branch)
     repo_url = resolve_repo_url(config, product_name)
     repo_dir = resolve_repo_dir(config, product_name)
 
@@ -417,9 +491,17 @@ def handle_get(
     ensure_excel_output_dir(excel_output_dir)
 
     if diff_commit_arg:
-        output_excel = excel_output_dir / build_diff_excel_filename(product_name, version)
+        output_excel = excel_output_dir / build_branch_diff_excel_filename(
+            product_name,
+            version,
+            debug_mode,
+        )
     else:
-        output_excel = excel_output_dir / build_excel_filename(product_name, version)
+        output_excel = excel_output_dir / build_branch_excel_filename(
+            product_name,
+            version,
+            debug_mode,
+        )
 
     writer_config = resolve_writer_config(config)
 
@@ -498,6 +580,7 @@ def handle_put(
         product_name=product_name,
         explicit_excel=excel_arg,
         explicit_version=version_arg,
+        branch=branch,
     )
 
     if not input_excel.exists():
@@ -555,6 +638,8 @@ def handle_put(
         input_excel=input_excel,
         product_name=product_name,
         new_version=new_version,
+        branch=branch,
+        default_branch=base_branch,
         logger=logger,
     )
 

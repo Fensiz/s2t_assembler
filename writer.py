@@ -1,13 +1,17 @@
 from __future__ import annotations
+
+import json
 import sys
-from pathlib import Path
-from openpyxl import Workbook
-from openpyxl.styles import Alignment, Font, PatternFill, Border, Side
-from openpyxl.worksheet.worksheet import Worksheet
-from openpyxl.utils import column_index_from_string, get_column_letter
 from difflib import SequenceMatcher
+from pathlib import Path
+from typing import Any
+
+from openpyxl import Workbook
 from openpyxl.cell.rich_text import CellRichText, TextBlock
 from openpyxl.cell.text import InlineFont
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from openpyxl.utils import column_index_from_string, get_column_letter
+from openpyxl.worksheet.worksheet import Worksheet
 
 from common import *
 
@@ -55,33 +59,27 @@ EXCEL_HEADER_LABELS = {
     "is_key": "Is a key",
     "description": "Description",
     "link": "Link",
-
     "table_code": "Table code",
     "table_name": "Table name",
-
     "settings_alias": "Settings alias",
     "settings_description": "Settings description",
     "settings_table": "Settings table",
     "settings_type": "Settings type",
     "period": "Period",
     "mask": "Mask",
-
     "parameter": "Parameter",
     "value": "Value",
     "comment": "Comment",
-
     "source_value": "Source value",
     "target_value": "Target value",
     "start_dt": "Start dt",
     "end_dt": "End dt",
     "update_date": "Update date",
     "author_update_name": "Author update name",
-
     "author": "Author",
     "date": "Date",
     "version": "Version",
     "jira_ticket": "Jira ticket",
-
     "load_code": "Load code",
     "attribute_code": "Attribute code",
     "attribute_name": "Attribute name",
@@ -92,13 +90,17 @@ EXCEL_HEADER_LABELS = {
     "table_codes_to_track_delta": "Table codes to track delta",
     "source_tables_join": "Source tables join",
     "settings_table_join": "Settings table join",
-    "history_rule": "History rule"
+    "history_rule": "History rule",
 }
 
 BLACK_FONT = InlineFont(color="000000")
 GREEN_FONT = InlineFont(color="008000")
 RED_FONT = InlineFont(color="FF0000", strike=True)
 
+
+# ============================================================
+# Diff helpers
+# ============================================================
 
 def build_rich_diff(old_text: str | None, new_text: str | None) -> CellRichText | str:
     old_value = "" if old_text is None else str(old_text)
@@ -132,6 +134,22 @@ def build_rich_diff(old_text: str | None, new_text: str | None) -> CellRichText 
     return rich
 
 
+def maybe_build_rich_diff(
+    diff_enabled: bool,
+    old_value: str | None,
+    new_value: str | None,
+) -> str | CellRichText:
+    """
+    Return plain text in normal mode and rich diff in diff mode.
+    """
+    new_text = "" if new_value is None else str(new_value)
+
+    if not diff_enabled:
+        return new_text
+
+    return build_rich_diff(old_value, new_text)
+
+
 def normalize_key_part(value: object) -> str:
     return "" if value is None else str(value)
 
@@ -148,21 +166,20 @@ def pre_transform_row_key(target_table: str) -> str:
 
 
 def mapping_row_key(load_code: str, table_name: str, attribute_code: str) -> tuple[str, str, str]:
-    return (normalize_key_part(load_code), normalize_key_part(table_name), normalize_key_part(attribute_code))
+    return (
+        normalize_key_part(load_code),
+        normalize_key_part(table_name),
+        normalize_key_part(attribute_code),
+    )
 
-def center_merged_headers(sheet: Worksheet, cfg: dict) -> None:
-    for merge_range in cfg.get("header_merge_ranges", []):
-        first_cell = merge_range.split(":")[0]
-        cell = sheet[first_cell]
 
-        cell.alignment = Alignment(
-            horizontal="center",
-            vertical="center",
-            wrap_text=True
-        )
+# ============================================================
+# Generic helpers
+# ============================================================
 
 def repo_header_to_excel(header: str) -> str:
     return EXCEL_HEADER_LABELS.get(header, header.replace("_", " ").capitalize())
+
 
 def load_writer_config(config_path: str | Path | None = None) -> dict[str, Any]:
     if config_path is None:
@@ -182,14 +199,20 @@ def create_sheet(wb: Workbook, title: str) -> Worksheet:
 def sheet_config(config: dict[str, Any], sheet_name: str) -> dict[str, Any]:
     global_cfg = config.get("global", {})
     per_sheet = config.get("sheets", {}).get(sheet_name, {})
-    merged = {**global_cfg, **per_sheet}
-    return merged
+    return {**global_cfg, **per_sheet}
 
 
 def color_fill(hex_color: str | None) -> PatternFill | None:
     if not hex_color:
         return None
     return PatternFill(fill_type="solid", start_color=hex_color, end_color=hex_color)
+
+
+def center_merged_headers(sheet: Worksheet, cfg: dict[str, Any]) -> None:
+    for merge_range in cfg.get("header_merge_ranges", []):
+        first_cell = merge_range.split(":")[0]
+        cell = sheet[first_cell]
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
 
 def apply_base_style(sheet: Worksheet, cfg: dict[str, Any]) -> None:
@@ -225,13 +248,10 @@ def estimate_row_height_for_text(
     line_height: float = 15.0,
 ) -> float:
     max_lines = 1
-
     for value in values:
         if not value:
             continue
-        lines = str(value).count("\n") + 1
-        if lines > max_lines:
-            max_lines = lines
+        max_lines = max(max_lines, str(value).count("\n") + 1)
 
     estimated = max(min_height, max_lines * line_height)
     return min(estimated, max_height)
@@ -337,27 +357,23 @@ def apply_special_header_colors(sheet: Worksheet, sheet_name: str, cfg: dict[str
     source_fill = color_fill(group_colors.get("source_section"))
 
     if sheet_name == PRE_TRANSFORMS_SHEET:
-        # 1 строка
         for col in range(1, 3):
             sheet.cell(row=1, column=col).fill = target_fill
         for col in range(3, 6):
             sheet.cell(row=1, column=col).fill = source_fill
 
-        # 2 строка
         for col in range(1, 3):
             sheet.cell(row=2, column=col).fill = target_fill
         for col in range(3, 6):
             sheet.cell(row=2, column=col).fill = source_fill
 
     elif sheet_name == JOINS_SHEET:
-        # 1 строка
         sheet.cell(row=1, column=1).fill = loadcode_fill
         for col in range(2, 6):
             sheet.cell(row=1, column=col).fill = target_fill
         for col in range(6, 11):
             sheet.cell(row=1, column=col).fill = source_fill
 
-        # 2 строка
         sheet.cell(row=2, column=1).fill = loadcode_fill
         for col in range(2, 6):
             sheet.cell(row=2, column=col).fill = target_fill
@@ -365,19 +381,18 @@ def apply_special_header_colors(sheet: Worksheet, sheet_name: str, cfg: dict[str
             sheet.cell(row=2, column=col).fill = source_fill
 
     elif sheet_name == MAPPINGS_SHEET:
-        # 1 строка
         sheet.cell(row=1, column=1).fill = loadcode_fill
         for col in range(2, 5):
             sheet.cell(row=1, column=col).fill = target_fill
         for col in range(5, 8):
             sheet.cell(row=1, column=col).fill = source_fill
 
-        # 2 строка
         sheet.cell(row=2, column=1).fill = loadcode_fill
         for col in range(2, 5):
             sheet.cell(row=2, column=col).fill = target_fill
         for col in range(5, 8):
             sheet.cell(row=2, column=col).fill = source_fill
+
 
 def apply_cell_borders(sheet: Worksheet) -> None:
     for row in sheet.iter_rows(
@@ -389,11 +404,18 @@ def apply_cell_borders(sheet: Worksheet) -> None:
         for cell in row:
             cell.border = THIN_BORDER
 
-def apply_table_borders(sheet: Worksheet, start_row: int, end_row: int, start_col: int = 1,
-                        end_col: int = 2) -> None:
+
+def apply_table_borders(
+    sheet: Worksheet,
+    start_row: int,
+    end_row: int,
+    start_col: int = 1,
+    end_col: int = 2,
+) -> None:
     for row_idx in range(start_row, end_row + 1):
         for col_idx in range(start_col, end_col + 1):
             sheet.cell(row=row_idx, column=col_idx).border = THIN_BORDER
+
 
 def apply_alternating_group_fill(sheet: Worksheet, cfg: dict[str, Any]) -> None:
     grouping = cfg.get("grouping", {})
@@ -420,7 +442,6 @@ def apply_alternating_group_fill(sheet: Worksheet, cfg: dict[str, Any]) -> None:
             group_index += 1
             previous_group_value = current_value
 
-        # красим только 2-ю, 4-ю, 6-ю...
         if group_index % 2 == 0:
             fill_row(sheet, row_idx, alt_color)
 
@@ -441,7 +462,17 @@ def finalize_sheet_style(sheet: Worksheet, config: dict[str, Any], sheet_name: s
         apply_cell_borders(sheet)
 
 
-def append_csv_sheet(wb: Workbook, title: str, csv_path: Path, config: dict[str, Any], required: bool = False) -> None:
+# ============================================================
+# Generic sheet builders
+# ============================================================
+
+def append_csv_sheet(
+    wb: Workbook,
+    title: str,
+    csv_path: Path,
+    config: dict[str, Any],
+    required: bool = False,
+) -> None:
     if not csv_path.exists():
         if required:
             raise ValueError(f"Required CSV not found: {csv_path}")
@@ -489,19 +520,23 @@ def build_targets_sheet(wb: Workbook, repo_dir: Path, config: dict[str, Any]) ->
     append_csv_sheet(wb, TARGETS_SHEET, repo_dir / TARGETS_CSV, config, required=True)
 
 
+# ============================================================
+# Pre-transforms
+# ============================================================
+
 def build_pre_transforms_sheet(
     wb: Workbook,
     repo_dir: Path,
     config: dict[str, Any],
     diff_repo_dir: str | None = None,
 ) -> None:
+    diff_enabled = diff_repo_dir is not None
+
     sheet = create_sheet(wb, PRE_TRANSFORMS_SHEET)
 
-    # первая строка — разделы
     sheet.cell(row=1, column=1, value="TARGET")
     sheet.cell(row=1, column=3, value="SOURCE")
 
-    # вторая строка — заголовки
     headers = [
         "Target table",
         "Source tables",
@@ -515,15 +550,14 @@ def build_pre_transforms_sheet(
 
     root = repo_dir / PRE_TRANSFORMS_DIR
 
-    # если каталога нет — просто создаём пустой лист с шапкой
     if not root.exists():
         finalize_sheet_style(sheet, config, PRE_TRANSFORMS_SHEET)
         return
 
     old_rows_by_key: dict[str, dict[str, str]] = {}
 
-    if diff_repo_dir:
-        old_root = Path(diff_repo_dir) / PRE_TRANSFORMS_DIR
+    if diff_enabled:
+        old_root = Path(diff_repo_dir) / PRE_TRANSFORMS_DIR  # type: ignore[arg-type]
         if old_root.exists():
             for old_table_dir in sorted([p for p in old_root.iterdir() if p.is_dir()], key=lambda p: p.name):
                 json_path = old_table_dir / "pre-transform.json"
@@ -560,15 +594,35 @@ def build_pre_transforms_sheet(
         old_row = old_rows_by_key.get(key, {})
 
         sheet.cell(row=row_idx, column=1, value=target_table)
-        sheet.cell(row=row_idx, column=2, value=build_rich_diff(old_row.get("source_tables"), source_tables))
-        sheet.cell(row=row_idx, column=3, value=build_rich_diff(old_row.get("transformation_sql"), transformation_sql))
-        sheet.cell(row=row_idx, column=4, value=build_rich_diff(old_row.get("comments"), comments))
-        sheet.cell(row=row_idx, column=5, value=build_rich_diff(old_row.get("settings_sql"), settings_sql))
+        sheet.cell(
+            row=row_idx,
+            column=2,
+            value=maybe_build_rich_diff(diff_enabled, old_row.get("source_tables"), source_tables),
+        )
+        sheet.cell(
+            row=row_idx,
+            column=3,
+            value=maybe_build_rich_diff(diff_enabled, old_row.get("transformation_sql"), transformation_sql),
+        )
+        sheet.cell(
+            row=row_idx,
+            column=4,
+            value=maybe_build_rich_diff(diff_enabled, old_row.get("comments"), comments),
+        )
+        sheet.cell(
+            row=row_idx,
+            column=5,
+            value=maybe_build_rich_diff(diff_enabled, old_row.get("settings_sql"), settings_sql),
+        )
 
         row_idx += 1
 
     finalize_sheet_style(sheet, config, PRE_TRANSFORMS_SHEET)
 
+
+# ============================================================
+# Joins
+# ============================================================
 
 def build_joins_sheet(
     wb: Workbook,
@@ -576,14 +630,16 @@ def build_joins_sheet(
     config: dict[str, Any],
     diff_repo_dir: str | None = None,
 ) -> None:
+    diff_enabled = diff_repo_dir is not None
+
     root = repo_dir / JOINS_DIR
     if not root.exists():
         raise ValueError(f"Required directory not found: {root}")
 
     old_rows_by_key: dict[tuple[str, str], dict[str, str]] = {}
 
-    if diff_repo_dir:
-        old_root = Path(diff_repo_dir) / JOINS_DIR
+    if diff_enabled:
+        old_root = Path(diff_repo_dir) / JOINS_DIR  # type: ignore[arg-type]
         if old_root.exists():
             for old_table_dir in sorted([p for p in old_root.iterdir() if p.is_dir()], key=lambda p: p.name):
                 for old_load_dir in sorted([p for p in old_table_dir.iterdir() if p.is_dir()], key=lambda p: p.name):
@@ -644,48 +700,68 @@ def build_joins_sheet(
             sheet.cell(
                 row=row_idx,
                 column=3,
-                value=build_rich_diff(old_row.get("description"), current_description),
+                value=maybe_build_rich_diff(diff_enabled, old_row.get("description"), current_description),
             )
             sheet.cell(
                 row=row_idx,
                 column=4,
-                value=build_rich_diff(old_row.get("table_codes"), current_table_codes),
+                value=maybe_build_rich_diff(diff_enabled, old_row.get("table_codes"), current_table_codes),
             )
             sheet.cell(
                 row=row_idx,
                 column=5,
-                value=build_rich_diff(old_row.get("table_codes_to_track_delta"), current_delta_codes),
+                value=maybe_build_rich_diff(
+                    diff_enabled,
+                    old_row.get("table_codes_to_track_delta"),
+                    current_delta_codes,
+                ),
             )
             sheet.cell(
                 row=row_idx,
                 column=6,
-                value=build_rich_diff(old_row.get("source_tables_join_sql"), current_source_join_sql),
+                value=maybe_build_rich_diff(
+                    diff_enabled,
+                    old_row.get("source_tables_join_sql"),
+                    current_source_join_sql,
+                ),
             )
             sheet.cell(
                 row=row_idx,
                 column=7,
-                value=build_rich_diff(old_row.get("load_code_params"), current_load_code_params),
+                value=maybe_build_rich_diff(diff_enabled, old_row.get("load_code_params"), current_load_code_params),
             )
             sheet.cell(
                 row=row_idx,
                 column=8,
-                value=build_rich_diff(old_row.get("settings_table_join_sql"), current_settings_join_sql),
+                value=maybe_build_rich_diff(
+                    diff_enabled,
+                    old_row.get("settings_table_join_sql"),
+                    current_settings_join_sql,
+                ),
             )
             sheet.cell(
                 row=row_idx,
                 column=9,
-                value=build_rich_diff(old_row.get("history_rule"), current_history_rule),
+                value=maybe_build_rich_diff(diff_enabled, old_row.get("history_rule"), current_history_rule),
             )
             sheet.cell(
                 row=row_idx,
                 column=10,
-                value=build_rich_diff(old_row.get("business_history_dates"), current_business_history_dates),
+                value=maybe_build_rich_diff(
+                    diff_enabled,
+                    old_row.get("business_history_dates"),
+                    current_business_history_dates,
+                ),
             )
 
             row_idx += 1
 
     finalize_sheet_style(sheet, config, JOINS_SHEET)
 
+
+# ============================================================
+# Mappings
+# ============================================================
 
 def resolve_attribute_name(table_name: str, attribute_code: str, attribute_names: dict[str, Any]) -> str:
     tables = attribute_names.get("tables", {}) or {}
@@ -702,10 +778,12 @@ def build_mappings_sheet(
     config: dict[str, Any],
     diff_repo_dir: str | None = None,
 ) -> None:
+    diff_enabled = diff_repo_dir is not None
+
     old_rows_by_key: dict[tuple[str, str, str], dict[str, str]] = {}
 
-    if diff_repo_dir:
-        old_root = Path(diff_repo_dir) / JOINS_DIR
+    if diff_enabled:
+        old_root = Path(diff_repo_dir) / JOINS_DIR  # type: ignore[arg-type]
         old_attribute_names = read_json_file(Path(diff_repo_dir) / ATTRIBUTE_NAMES_JSON, default={}) or {}
 
         if old_root.exists():
@@ -728,8 +806,11 @@ def build_mappings_sheet(
 
                         key = mapping_row_key(old_load_dir.name, old_table_dir.name, attribute_code)
                         old_rows_by_key[key] = {
-                            "attribute_name": resolve_attribute_name(old_table_dir.name, attribute_code,
-                                                                     old_attribute_names),
+                            "attribute_name": resolve_attribute_name(
+                                old_table_dir.name,
+                                attribute_code,
+                                old_attribute_names,
+                            ),
                             "mapping_algorithm": mapping_algorithm,
                             "additional_join": extra_item.get("additional_join", ""),
                             "settings": extra_item.get("settings", ""),
@@ -789,29 +870,35 @@ def build_mappings_sheet(
                 current_additional_join = extra_item.get("additional_join", "")
                 current_settings = extra_item.get("settings", "")
 
-                sheet.cell(row=row_idx, column=4, value=build_rich_diff(old_row.get("attribute_name"), current_attribute_name))
-                sheet.cell(row=row_idx, column=5, value=build_rich_diff(old_row.get("mapping_algorithm"), mapping_algorithm))
-                sheet.cell(row=row_idx, column=6, value=build_rich_diff(old_row.get("additional_join"), current_additional_join))
-                sheet.cell(row=row_idx, column=7, value=build_rich_diff(old_row.get("settings"), current_settings))
+                sheet.cell(
+                    row=row_idx,
+                    column=4,
+                    value=maybe_build_rich_diff(diff_enabled, old_row.get("attribute_name"), current_attribute_name),
+                )
+                sheet.cell(
+                    row=row_idx,
+                    column=5,
+                    value=maybe_build_rich_diff(diff_enabled, old_row.get("mapping_algorithm"), mapping_algorithm),
+                )
+                sheet.cell(
+                    row=row_idx,
+                    column=6,
+                    value=maybe_build_rich_diff(diff_enabled, old_row.get("additional_join"), current_additional_join),
+                )
+                sheet.cell(
+                    row=row_idx,
+                    column=7,
+                    value=maybe_build_rich_diff(diff_enabled, old_row.get("settings"), current_settings),
+                )
 
                 row_idx += 1
 
     finalize_sheet_style(sheet, config, MAPPINGS_SHEET)
 
 
-def pretty_metadata_header(value: str) -> str:
-    mapping = {
-        "value_name": "Value name",
-        "value": "Value",
-        "description": "Description",
-        "key": "Key",
-    }
-    return mapping.get(value, value.replace("_", " ").capitalize())
-
-def bundled_path(relative_path: str) -> Path:
-    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
-        return Path(sys._MEIPASS) / relative_path
-    return Path(__file__).resolve().parent / relative_path
+# ============================================================
+# Metadata
+# ============================================================
 
 def normalize_table_row(values: Any, headers: list[str] | None) -> list[Any]:
     if isinstance(values, list):
@@ -905,7 +992,6 @@ def build_metadata_sheet(
 
             for raw_row in rows:
                 normalized_row = normalize_table_row(raw_row, header_names)
-
                 max_width = max(max_width, len(normalized_row))
 
                 for col_idx, value in enumerate(normalized_row, start=1):
@@ -918,11 +1004,14 @@ def build_metadata_sheet(
             if max_width > 0 and table_end_row >= table_start_row:
                 apply_table_borders(sheet, table_start_row, table_end_row, 1, max_width)
 
-        # Empty row between blocks
         row_idx += 1
 
     finalize_sheet_style(sheet, config, METADATA_SHEET)
 
+
+# ============================================================
+# Main entry
+# ============================================================
 
 def build_excel_from_repo(
     repo_dir: str,
