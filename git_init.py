@@ -5,8 +5,9 @@ import os
 import shutil
 import subprocess
 import webbrowser
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import Any
 
 
 @dataclass
@@ -16,7 +17,7 @@ class SetupState:
 
 
 class InitialSetupService:
-    def __init__(self, app_config: dict, logger=None) -> None:
+    def __init__(self, app_config: dict[str, Any], logger=None) -> None:
         self.app_config = app_config
         self.logger = logger
 
@@ -24,11 +25,22 @@ class InitialSetupService:
         self.state_file = self.s2t_dir / "setup.json"
 
         self.ssh_dir = Path.home() / ".ssh"
+        self.known_hosts_file = self.ssh_dir / "known_hosts"
+
         self.bitbucket_ssh_page_url = self._build_bitbucket_ssh_page_url()
 
     def ensure_initial_setup(self) -> None:
+        """
+        Ensure first-run SSH setup is completed:
+
+        1. Add Bitbucket host to known_hosts
+        2. Ensure local SSH public key exists
+        3. Open Bitbucket SSH keys page
+        4. Log public key so user can copy it
+        """
         state = self._load_state()
         if state.ssh_setup_prompt_shown:
+            self._log("Initial setup already completed.")
             return
 
         self._ensure_known_host()
@@ -51,6 +63,43 @@ class InitialSetupService:
 
         state.ssh_setup_prompt_shown = True
         self._save_state(state)
+
+    def _build_bitbucket_ssh_page_url(self) -> str:
+        """
+        Build Bitbucket page URL where user can add SSH keys.
+        """
+        base_url = str(self.app_config["repo_base_url"]).strip()
+        host = self._extract_host(base_url)
+        return f"https://{host}/plugins/servlet/ssh/account/keys"
+
+    def _extract_host(self, repo_url: str) -> str:
+        """
+        Extract host from supported repository/base URL formats.
+        """
+        # https://host/...
+        if repo_url.startswith("https://"):
+            without_scheme = repo_url[len("https://"):]
+            return without_scheme.split("/", 1)[0].split(":", 1)[0]
+
+        # http://host/...
+        if repo_url.startswith("http://"):
+            without_scheme = repo_url[len("http://"):]
+            return without_scheme.split("/", 1)[0].split(":", 1)[0]
+
+        # ssh://git@host:7999/project/repo.git
+        if repo_url.startswith("ssh://"):
+            without_scheme = repo_url[len("ssh://"):]
+            if "@" in without_scheme:
+                without_scheme = without_scheme.split("@", 1)[1]
+            host_port = without_scheme.split("/", 1)[0]
+            return host_port.split(":", 1)[0]
+
+        # git@host:project/repo.git
+        if "@" in repo_url and ":" in repo_url:
+            after_at = repo_url.split("@", 1)[1]
+            return after_at.split(":", 1)[0]
+
+        raise RuntimeError(f"Unsupported repo URL format: {repo_url}")
 
     def _ensure_known_host(self) -> None:
         """
@@ -87,9 +136,12 @@ class InitialSetupService:
                 f"stderr: {error_output}"
             )
 
+        file_exists = self.known_hosts_file.exists()
+        file_has_content = file_exists and self.known_hosts_file.stat().st_size > 0
+
         self.known_hosts_file.parent.mkdir(parents=True, exist_ok=True)
         with self.known_hosts_file.open("a", encoding="utf-8") as f:
-            if self.known_hosts_file.exists() and self.known_hosts_file.stat().st_size > 0:
+            if file_has_content:
                 f.write("\n")
             f.write(output)
             f.write("\n")
@@ -114,34 +166,13 @@ class InitialSetupService:
             )
             return result.returncode == 0 and bool(result.stdout.strip())
 
-        # fallback: simple text check
         content = self.known_hosts_file.read_text(encoding="utf-8", errors="ignore")
         return host in content
 
-    def _build_bitbucket_ssh_page_url(self) -> str:
-        base_url = str(self.app_config["repo_base_url"]).strip()
-        host = self._extract_host(base_url)
-        return f"https://{host}/plugins/servlet/ssh/account/keys"
-
-    def _extract_host(self, repo_url: str) -> str:
-        # ssh://git@host:7999/project/repo.git
-        if repo_url.startswith("ssh://"):
-            without_scheme = repo_url[len("ssh://"):]
-            if "@" in without_scheme:
-                without_scheme = without_scheme.split("@", 1)[1]
-            host_port = without_scheme.split("/", 1)[0]
-            if ":" in host_port:
-                return host_port.split(":", 1)[0]
-            return host_port
-
-        # git@host:project/repo.git
-        if "@" in repo_url and ":" in repo_url:
-            after_at = repo_url.split("@", 1)[1]
-            return after_at.split(":", 1)[0]
-
-        raise RuntimeError(f"Unsupported repoUrl format: {repo_url}")
-
     def _ensure_local_public_key(self) -> Path:
+        """
+        Ensure local SSH public key exists. If not, create ed25519 keypair.
+        """
         self.ssh_dir.mkdir(parents=True, exist_ok=True)
         self._chmod_if_possible(self.ssh_dir, 0o700)
 
@@ -159,10 +190,14 @@ class InitialSetupService:
         subprocess.run(
             [
                 ssh_keygen,
-                "-t", "ed25519",
-                "-N", "",
-                "-C", "s2t-auto-key",
-                "-f", str(private_key),
+                "-t",
+                "ed25519",
+                "-N",
+                "",
+                "-C",
+                "s2t-auto-key",
+                "-f",
+                str(private_key),
             ],
             check=True,
             stdout=subprocess.DEVNULL,
@@ -184,6 +219,9 @@ class InitialSetupService:
         ]
 
     def _open_bitbucket_ssh_keys_page(self) -> None:
+        """
+        Open Bitbucket SSH keys page in browser.
+        """
         try:
             webbrowser.open(self.bitbucket_ssh_page_url)
             self._log(f"Открыта страница Bitbucket: {self.bitbucket_ssh_page_url}")
@@ -192,6 +230,9 @@ class InitialSetupService:
             self._log(f"Откройте вручную: {self.bitbucket_ssh_page_url}")
 
     def _load_state(self) -> SetupState:
+        """
+        Load persisted initial setup state.
+        """
         if not self.state_file.exists():
             return SetupState()
 
@@ -202,6 +243,9 @@ class InitialSetupService:
             return SetupState()
 
     def _save_state(self, state: SetupState) -> None:
+        """
+        Save persisted initial setup state.
+        """
         self.s2t_dir.mkdir(parents=True, exist_ok=True)
         self.state_file.write_text(
             json.dumps(asdict(state), ensure_ascii=False, indent=2),
@@ -209,6 +253,9 @@ class InitialSetupService:
         )
 
     def _log(self, message: str) -> None:
+        """
+        Send message to UI logger if provided, otherwise print to console.
+        """
         if self.logger is not None:
             try:
                 self.logger(message)
