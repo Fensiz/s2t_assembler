@@ -3,7 +3,9 @@ from __future__ import annotations
 import tkinter as tk
 from pathlib import Path
 
+from git_init import InitialSetupService
 from main import handle_get, handle_put, load_app_config
+from main_config import resolve_excel_output_dir
 from ui_models import GetRequest, PutRequest
 from ui_recent_store import RecentItemsStore
 from ui_utils import find_latest_excel_file, open_directory_in_os, open_file_in_os, run_in_thread
@@ -26,6 +28,14 @@ class S2TApp:
         )
 
         self._fill_recent_items()
+
+        try:
+            InitialSetupService(
+                self.config,
+                logger=lambda message: self.view.append_status(message),
+            ).ensure_initial_setup()
+        except Exception as exc:
+            self.view.append_status(f"Initial setup skipped: {exc}")
 
     # --------------------------------------------------------
     # UI-thread helpers
@@ -142,7 +152,7 @@ class S2TApp:
         This is the current working directory where the tool was launched.
         """
         try:
-            folder = Path.cwd()
+            folder = resolve_excel_output_dir(self.config)
             open_directory_in_os(folder)
             self.view.append_status(f"Opened folder: {folder}")
         except Exception as exc:
