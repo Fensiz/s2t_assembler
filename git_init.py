@@ -69,37 +69,78 @@ class InitialSetupService:
         Build Bitbucket page URL where user can add SSH keys.
         """
         base_url = str(self.app_config["repo_base_url"]).strip()
-        host = self._extract_host(base_url)
+        host, _ = self._extract_host_and_port(base_url)
         return f"https://{host}/plugins/servlet/ssh/account/keys"
 
-    def _extract_host(self, repo_url: str) -> str:
+    def _extract_host_and_port(self, repo_url: str) -> tuple[str, int | None]:
         """
-        Extract host from supported repository/base URL formats.
+        Extract host and optional SSH port from supported repository/base URL formats.
+
+        Supported examples:
+            https://stash.corp.com/scm/project
+            https://stash.corp.com:8443/scm/project
+            ssh://git@stash.corp.com:7999/project/repo.git
+            git@stash.corp.com:project/repo.git
         """
-        # https://host/...
+        # https://host/... or https://host:port/...
         if repo_url.startswith("https://"):
             without_scheme = repo_url[len("https://"):]
-            return without_scheme.split("/", 1)[0].split(":", 1)[0]
+            host_part = without_scheme.split("/", 1)[0]
+            if ":" in host_part:
+                host, port_str = host_part.split(":", 1)
+                try:
+                    return host, int(port_str)
+                except ValueError:
+                    return host, None
+            return host_part, None
 
-        # http://host/...
+        # http://host/... or http://host:port/...
         if repo_url.startswith("http://"):
             without_scheme = repo_url[len("http://"):]
-            return without_scheme.split("/", 1)[0].split(":", 1)[0]
+            host_part = without_scheme.split("/", 1)[0]
+            if ":" in host_part:
+                host, port_str = host_part.split(":", 1)
+                try:
+                    return host, int(port_str)
+                except ValueError:
+                    return host, None
+            return host_part, None
 
         # ssh://git@host:7999/project/repo.git
         if repo_url.startswith("ssh://"):
             without_scheme = repo_url[len("ssh://"):]
             if "@" in without_scheme:
                 without_scheme = without_scheme.split("@", 1)[1]
+
             host_port = without_scheme.split("/", 1)[0]
-            return host_port.split(":", 1)[0]
+            if ":" in host_port:
+                host, port_str = host_port.split(":", 1)
+                try:
+                    return host, int(port_str)
+                except ValueError:
+                    return host, None
+
+            return host_port, None
 
         # git@host:project/repo.git
+        # Здесь двоеточие после host не означает порт, а разделяет путь репозитория.
         if "@" in repo_url and ":" in repo_url:
             after_at = repo_url.split("@", 1)[1]
-            return after_at.split(":", 1)[0]
+            host = after_at.split(":", 1)[0]
+            return host, None
 
         raise RuntimeError(f"Unsupported repo URL format: {repo_url}")
+
+    def _known_hosts_lookup_name(self, host: str, port: int | None) -> str:
+        """
+        Build host key lookup name for known_hosts.
+
+        For non-default SSH port OpenSSH uses:
+            [host]:port
+        """
+        if port is None or port == 22:
+            return host
+        return f"[{host}]:{port}"
 
     def _ensure_known_host(self) -> None:
         """
@@ -108,20 +149,28 @@ class InitialSetupService:
         self.ssh_dir.mkdir(parents=True, exist_ok=True)
         self._chmod_if_possible(self.ssh_dir, 0o700)
 
-        host = self._extract_host(str(self.app_config["repo_base_url"]).strip())
+        repo_base_url = str(self.app_config["repo_base_url"]).strip()
+        host, port = self._extract_host_and_port(repo_base_url)
+        lookup_name = self._known_hosts_lookup_name(host, port)
 
-        if self._known_host_exists(host):
-            self._log(f"Host already exists in known_hosts: {host}")
+        if self._known_host_exists(lookup_name):
+            self._log(f"Host already exists in known_hosts: {lookup_name}")
             return
 
         ssh_keyscan = shutil.which("ssh-keyscan")
         if not ssh_keyscan:
             raise RuntimeError("ssh-keyscan not found in PATH")
+        ssh_keyscan = str(ssh_keyscan)
 
-        self._log(f"Scanning SSH host key for: {host}")
+        self._log(f"Scanning SSH host key for: {lookup_name}")
+
+        cmd = [ssh_keyscan, "-H"]
+        if port is not None and port != 22:
+            cmd.extend(["-p", str(port)])
+        cmd.append(host)
 
         result = subprocess.run(
-            [ssh_keyscan, "-H", host],
+            cmd,
             check=False,
             capture_output=True,
             text=True,
@@ -132,7 +181,7 @@ class InitialSetupService:
 
         if result.returncode != 0 or not output:
             raise RuntimeError(
-                f"Failed to scan SSH host key for '{host}'. "
+                f"Failed to scan SSH host key for '{lookup_name}'. "
                 f"stderr: {error_output}"
             )
 
@@ -147,27 +196,38 @@ class InitialSetupService:
             f.write("\n")
 
         self._chmod_if_possible(self.known_hosts_file, 0o644)
-        self._log(f"Host added to known_hosts: {host}")
 
-    def _known_host_exists(self, host: str) -> bool:
+        if self._known_host_exists(lookup_name):
+            self._log(f"Host added to known_hosts: {lookup_name}")
+        else:
+            self._log(
+                f"SSH host key was written to known_hosts, but lookup by name "
+                f"'{lookup_name}' did not confirm it."
+            )
+
+    def _known_host_exists(self, lookup_name: str) -> bool:
         """
         Check whether host is already present in ~/.ssh/known_hosts.
+
+        Works with hashed entries too when ssh-keygen is available.
         """
         if not self.known_hosts_file.exists():
             return False
 
         ssh_keygen = shutil.which("ssh-keygen")
         if ssh_keygen:
+            ssh_keygen = str(ssh_keygen)
             result = subprocess.run(
-                [ssh_keygen, "-F", host, "-f", str(self.known_hosts_file)],
+                [ssh_keygen, "-F", lookup_name, "-f", str(self.known_hosts_file)],
                 check=False,
                 capture_output=True,
                 text=True,
             )
             return result.returncode == 0 and bool(result.stdout.strip())
 
+        # Fallback: plain text search only works reliably for non-hashed entries.
         content = self.known_hosts_file.read_text(encoding="utf-8", errors="ignore")
-        return host in content
+        return lookup_name in content
 
     def _ensure_local_public_key(self) -> Path:
         """
@@ -183,6 +243,7 @@ class InitialSetupService:
         ssh_keygen = shutil.which("ssh-keygen")
         if not ssh_keygen:
             raise RuntimeError("ssh-keygen not found in PATH")
+        ssh_keygen = str(ssh_keygen)
 
         private_key = self.ssh_dir / "id_ed25519"
         public_key = self.ssh_dir / "id_ed25519.pub"
