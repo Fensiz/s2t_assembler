@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import shutil
+import subprocess
+import sys
 import tkinter as tk
 from pathlib import Path
-from typing import Any
 
 from InitialSetupService import InitialSetupService
 from UpdateService import UpdateService
@@ -341,14 +343,53 @@ class S2TApp:
 
         run_in_thread(worker)
 
+    def _restart_with_updated_app(self, app_path: Path) -> None:
+        """
+        Launch updated app and close current UI.
+        """
+        try:
+            python_executable = sys.executable
+            if not python_executable:
+                python_executable = (
+                    shutil.which("pythonw")
+                    or shutil.which("python3")
+                    or shutil.which("python")
+                    or "python3"
+                )
+
+            command = [python_executable, str(app_path)]
+            self.view.append_status(f"Запускаю новую версию: {' '.join(command)}")
+
+            subprocess.Popen(
+                command,
+                start_new_session=True,
+                close_fds=True,
+            )
+
+            self.view.append_status("Новая версия запущена. Закрываю текущее окно...")
+            self.root.after(200, self.root.destroy)
+
+        except Exception as exc:
+            self.view.show_error(
+                "Обновление",
+                f"Не удалось перезапустить приложение:\n{exc}",
+            )
+            self.view.append_status(f"Ошибка перезапуска: {exc}")
+            self.view.set_action_buttons_enabled(True)
+
     def _perform_update(self) -> None:
         """
         Download/install update and restart application.
         """
         try:
-            self.update_service.perform_update()
-        except SystemExit:
-            raise
+            updated_app_path = self.update_service.perform_update()
+
+            self._append_status_ui("Обновление установлено. Перезапуск приложения...")
+
+            self._call_in_ui(
+                lambda path=updated_app_path: self._restart_with_updated_app(path)
+            )
+
         except Exception as exc:
             error_text = str(exc)
             self._call_in_ui(
