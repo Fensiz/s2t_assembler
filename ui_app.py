@@ -2,13 +2,20 @@ from __future__ import annotations
 
 import tkinter as tk
 from pathlib import Path
+from typing import Any
 
-from git_init import InitialSetupService
+from InitialSetupService import InitialSetupService
+from UpdateService import UpdateService
 from main import handle_get, handle_put, load_app_config
 from main_config import resolve_excel_output_dir
 from ui_models import GetRequest, PutRequest
 from ui_recent_store import RecentItemsStore
-from ui_utils import find_latest_excel_file, open_directory_in_os, open_file_in_os, run_in_thread
+from ui_utils import (
+    find_latest_excel_file,
+    open_directory_in_os,
+    open_file_in_os,
+    run_in_thread,
+)
 from ui_view import S2TView
 
 
@@ -20,11 +27,17 @@ class S2TApp:
         self.root = tk.Tk()
         self.view = S2TView(self.root)
 
+        self.update_service = UpdateService(
+            self.config,
+            logger=lambda message: self.view.append_status(message),
+        )
+
         self.view.bind_actions(
             on_get=self.run_get,
             on_put=self.run_put,
             on_open_folder=self.run_open_s2t_folder,
             on_recent_select=self._on_recent_select,
+            on_version_click=self._on_version_click,
         )
 
         self._fill_recent_items()
@@ -36,6 +49,8 @@ class S2TApp:
             ).ensure_initial_setup()
         except Exception as exc:
             self.view.append_status(f"Initial setup skipped: {exc}")
+
+        self.root.after(1000, self._check_updates_on_start)
 
     # --------------------------------------------------------
     # UI-thread helpers
@@ -69,7 +84,9 @@ class S2TApp:
             except Exception as exc:
                 error_text = str(exc)
                 self._set_status_ui(f"{error_title} failed:\n{error_text}")
-                self._call_in_ui(lambda msg=error_text: self.view.show_error(f"{error_title} failed", msg))
+                self._call_in_ui(
+                    lambda msg=error_text: self.view.show_error(f"{error_title} failed", msg)
+                )
             finally:
                 self._call_in_ui(lambda: self.view.set_action_buttons_enabled(True))
 
@@ -102,7 +119,7 @@ class S2TApp:
             {
                 "product_name": product_name,
                 "branch": branch,
-            }
+            },
         )
 
         self.recent_store.save(filtered)
@@ -149,7 +166,6 @@ class S2TApp:
     def run_open_s2t_folder(self) -> None:
         """
         Open directory where S2T Excel files are created.
-        This is the current working directory where the tool was launched.
         """
         try:
             folder = resolve_excel_output_dir(self.config)
@@ -231,7 +247,7 @@ class S2TApp:
             logger=self._ui_logger,
         )
 
-        excel_dir = Path(self.config.get("excel_output_dir", ".")).expanduser().resolve()
+        excel_dir = resolve_excel_output_dir(self.config)
         downloaded_file = find_latest_excel_file(
             excel_dir=excel_dir,
             product_name=request.product_name,
@@ -252,3 +268,94 @@ class S2TApp:
         )
 
         self._call_in_ui(lambda: self._after_put_success(request))
+
+    # --------------------------------------------------------
+    # Update service
+    # --------------------------------------------------------
+
+    def _check_updates_on_start(self) -> None:
+        """
+        Check for updates after UI startup and highlight version widget if needed.
+        """
+        def worker() -> None:
+            try:
+                available, latest_version = self.update_service.check_update()
+                self._call_in_ui(
+                    lambda: self.view.set_update_available(available, latest_version)
+                )
+
+                if available and latest_version:
+                    self._append_status_ui(f"Доступно обновление: {latest_version}")
+            except Exception as exc:
+                self._append_status_ui(f"Не удалось проверить обновления: {exc}")
+
+        run_in_thread(worker)
+
+    def _on_version_click(self, event) -> None:
+        """
+        Handle click on version widget.
+        If update is available, ask user and perform update.
+        Otherwise just show current status.
+        """
+        def worker() -> None:
+            try:
+                available, latest_version = self.update_service.check_update()
+
+                self._call_in_ui(
+                    lambda: self.view.set_update_available(available, latest_version)
+                )
+
+                if not available:
+                    self._call_in_ui(
+                        lambda: self.view.show_info(
+                            "Обновление",
+                            "У вас уже установлена последняя версия.",
+                        )
+                    )
+                    return
+
+                message = (
+                    f"Доступна новая версия: {latest_version}.\n\n"
+                    f"Установить обновление сейчас?"
+                )
+
+                def ask_and_update() -> None:
+                    confirmed = self.view.ask_yes_no("Обновление", message)
+                    if not confirmed:
+                        return
+
+                    self.view.append_status("Начинаю обновление...")
+                    self.view.set_action_buttons_enabled(False)
+                    run_in_thread(self._perform_update)
+
+                self._call_in_ui(ask_and_update)
+
+            except Exception as exc:
+                error_text = str(exc)
+                self._call_in_ui(
+                    lambda msg=error_text: self.view.show_error(
+                        "Обновление",
+                        f"Не удалось проверить обновление:\n{msg}",
+                    )
+                )
+
+        run_in_thread(worker)
+
+    def _perform_update(self) -> None:
+        """
+        Download/install update and restart application.
+        """
+        try:
+            self.update_service.perform_update()
+        except SystemExit:
+            raise
+        except Exception as exc:
+            error_text = str(exc)
+            self._call_in_ui(
+                lambda msg=error_text: self.view.show_error(
+                    "Обновление",
+                    f"Не удалось установить обновление:\n{msg}",
+                )
+            )
+            self._append_status_ui(f"Ошибка обновления: {error_text}")
+            self._call_in_ui(lambda: self.view.set_action_buttons_enabled(True))

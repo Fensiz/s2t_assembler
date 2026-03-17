@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import tkinter as tk
 from tkinter import messagebox
+from typing import Callable, Any
 
+from app_info import APP_VERSION
 from ui_models import GetRequest, PutRequest
 
 
@@ -27,13 +29,44 @@ class S2TView:
         self.put_button: tk.Button | None = None
         self.open_folder_button: tk.Button | None = None
 
+        self.version_container: tk.Frame | None = None
+        self.version_label: tk.Label | None = None
+
         self.build()
 
+    # --------------------------------------------------------
+    # Build UI
+    # --------------------------------------------------------
+
     def build(self) -> None:
+        self._build_header_area()
         self._build_form_area()
         self._build_controls_area()
         self._build_recent_area()
         self._build_status_area()
+
+    def _build_header_area(self) -> None:
+        header_frame = tk.Frame(self.root)
+        header_frame.pack(fill="x", padx=10, pady=(10, 0))
+
+        left_spacer = tk.Frame(header_frame)
+        left_spacer.pack(side="left", fill="x", expand=True)
+
+        self.version_container = tk.Frame(
+            header_frame,
+            highlightthickness=0,
+            bd=0,
+        )
+        self.version_container.pack(side="right", anchor="ne")
+
+        self.version_label = tk.Label(
+            self.version_container,
+            text=f"v{APP_VERSION}",
+            cursor="hand2",
+            padx=8,
+            pady=4,
+        )
+        self.version_label.pack()
 
     def _build_form_area(self) -> None:
         form_container = tk.Frame(self.root)
@@ -114,22 +147,35 @@ class S2TView:
         self.status_text = tk.Text(self.root, height=12, state="disabled")
         self.status_text.pack(fill="both", expand=True, padx=10, pady=(0, 10))
 
+    # --------------------------------------------------------
+    # Bindings
+    # --------------------------------------------------------
+
     def bind_actions(
         self,
-        on_get,
-        on_put,
-        on_open_folder,
-        on_recent_select,
+        on_get: Callable[[], None],
+        on_put: Callable[[], None],
+        on_open_folder: Callable[[], None],
+        on_recent_select: Callable[[Any], None],
+        on_version_click: Callable[[Any], None] | None = None,
     ) -> None:
         assert self.get_button is not None
         assert self.put_button is not None
         assert self.open_folder_button is not None
         assert self.recent_listbox is not None
+        assert self.version_label is not None
 
         self.get_button.config(command=on_get)
         self.put_button.config(command=on_put)
         self.open_folder_button.config(command=on_open_folder)
         self.recent_listbox.bind("<<ListboxSelect>>", on_recent_select)
+
+        if on_version_click is not None:
+            self.version_label.bind("<Button-1>", on_version_click)
+
+    # --------------------------------------------------------
+    # Status
+    # --------------------------------------------------------
 
     def set_status(self, message: str) -> None:
         """
@@ -159,6 +205,10 @@ class S2TView:
         self.status_text.see(tk.END)
         self.status_text.configure(state="disabled")
 
+    # --------------------------------------------------------
+    # Buttons / state
+    # --------------------------------------------------------
+
     def set_action_buttons_enabled(self, enabled: bool) -> None:
         """
         Enable or disable main action buttons during background operations.
@@ -172,7 +222,43 @@ class S2TView:
         self.get_button.config(state=state)
         self.put_button.config(state=state)
 
-    def fill_recent_items(self, items: list[dict[str, str]], label_builder) -> None:
+    # --------------------------------------------------------
+    # Version / update indicator
+    # --------------------------------------------------------
+
+    def set_update_available(self, available: bool, latest_version: str | None = None) -> None:
+        """
+        Highlight version widget if update is available.
+        """
+        assert self.version_container is not None
+        assert self.version_label is not None
+
+        if available:
+            self.version_container.config(
+                highlightbackground="red",
+                highlightcolor="red",
+                highlightthickness=2,
+            )
+            if latest_version:
+                self.version_label.config(text=f"v{APP_VERSION} → {latest_version}")
+            else:
+                self.version_label.config(text=f"v{APP_VERSION}")
+        else:
+            self.version_container.config(highlightthickness=0)
+            self.version_label.config(text=f"v{APP_VERSION}")
+
+    def set_version_text(self, text: str) -> None:
+        """
+        Override displayed version text.
+        """
+        assert self.version_label is not None
+        self.version_label.config(text=text)
+
+    # --------------------------------------------------------
+    # Recent items
+    # --------------------------------------------------------
+
+    def fill_recent_items(self, items: list[dict[str, str]], label_builder: Callable[[dict[str, str]], str]) -> None:
         """
         Fill recent items listbox from provided items.
         """
@@ -181,6 +267,10 @@ class S2TView:
         self.recent_listbox.delete(0, tk.END)
         for item in items:
             self.recent_listbox.insert(tk.END, label_builder(item))
+
+    # --------------------------------------------------------
+    # Form read/write
+    # --------------------------------------------------------
 
     def read_get_request(self) -> GetRequest:
         assert self.product_entry is not None
@@ -233,8 +323,22 @@ class S2TView:
         self.commit_message_entry.delete(0, tk.END)
         self.version_entry.delete(0, tk.END)
 
+    # --------------------------------------------------------
+    # Dialogs
+    # --------------------------------------------------------
+
     def show_error(self, title: str, message: str) -> None:
         messagebox.showerror(title, message)
+
+    def ask_yes_no(self, title: str, message: str) -> bool:
+        return messagebox.askyesno(title, message)
+
+    def show_info(self, title: str, message: str) -> None:
+        messagebox.showinfo(title, message)
+
+    # --------------------------------------------------------
+    # Helpers
+    # --------------------------------------------------------
 
     @staticmethod
     def _resolve_branch_value(branch_text: str) -> str | None:

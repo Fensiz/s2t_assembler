@@ -6,6 +6,7 @@ PYZ_FILE := $(DIST_DIR)/$(APP_NAME).pyz
 
 SOURCES = \
 	__main__.py \
+	app_info.py \
 	ui.py \
 	ui_app.py \
 	ui_models.py \
@@ -22,7 +23,8 @@ SOURCES = \
 	reader.py \
 	writer.py \
 	common.py \
-	git_init.py \
+	InitialSetupService.py \
+	UpdateService.py \
 	git_repo.py \
 	metadata.json \
 	writer_config.json \
