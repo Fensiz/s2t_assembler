@@ -31,6 +31,8 @@ class InitialSetupService:
         if state.ssh_setup_prompt_shown:
             return
 
+        self._ensure_known_host()
+
         public_key_path = self._ensure_local_public_key()
         public_key = public_key_path.read_text(encoding="utf-8").strip()
 
@@ -49,6 +51,72 @@ class InitialSetupService:
 
         state.ssh_setup_prompt_shown = True
         self._save_state(state)
+
+    def _ensure_known_host(self) -> None:
+        """
+        Ensure Bitbucket host key is present in ~/.ssh/known_hosts.
+        """
+        self.ssh_dir.mkdir(parents=True, exist_ok=True)
+        self._chmod_if_possible(self.ssh_dir, 0o700)
+
+        host = self._extract_host(str(self.app_config["repo_base_url"]).strip())
+
+        if self._known_host_exists(host):
+            self._log(f"Host already exists in known_hosts: {host}")
+            return
+
+        ssh_keyscan = shutil.which("ssh-keyscan")
+        if not ssh_keyscan:
+            raise RuntimeError("ssh-keyscan not found in PATH")
+
+        self._log(f"Scanning SSH host key for: {host}")
+
+        result = subprocess.run(
+            [ssh_keyscan, "-H", host],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        output = result.stdout.strip()
+        error_output = result.stderr.strip()
+
+        if result.returncode != 0 or not output:
+            raise RuntimeError(
+                f"Failed to scan SSH host key for '{host}'. "
+                f"stderr: {error_output}"
+            )
+
+        self.known_hosts_file.parent.mkdir(parents=True, exist_ok=True)
+        with self.known_hosts_file.open("a", encoding="utf-8") as f:
+            if self.known_hosts_file.exists() and self.known_hosts_file.stat().st_size > 0:
+                f.write("\n")
+            f.write(output)
+            f.write("\n")
+
+        self._chmod_if_possible(self.known_hosts_file, 0o644)
+        self._log(f"Host added to known_hosts: {host}")
+
+    def _known_host_exists(self, host: str) -> bool:
+        """
+        Check whether host is already present in ~/.ssh/known_hosts.
+        """
+        if not self.known_hosts_file.exists():
+            return False
+
+        ssh_keygen = shutil.which("ssh-keygen")
+        if ssh_keygen:
+            result = subprocess.run(
+                [ssh_keygen, "-F", host, "-f", str(self.known_hosts_file)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            return result.returncode == 0 and bool(result.stdout.strip())
+
+        # fallback: simple text check
+        content = self.known_hosts_file.read_text(encoding="utf-8", errors="ignore")
+        return host in content
 
     def _build_bitbucket_ssh_page_url(self) -> str:
         base_url = str(self.app_config["repo_base_url"]).strip()
