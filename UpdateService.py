@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -27,8 +28,13 @@ class UpdateService:
         self.versions_dir = self.app_dir / "versions"
         self.current_link = self.app_dir / "current.pyz"
 
+        self.is_windows = os.name == "nt"
+
+        # launcher нужен только на Unix-like системах
         self.launcher_path = self.base_dir / "s2t-tool.command"
-        self.desktop_shortcut_path = (Path.home() / "Desktop" / "s2t-tool.command")
+        self.desktop_shortcut_path = (
+            Path.home() / "Desktop" / ("s2t-tool.lnk" if self.is_windows else "s2t-tool.command")
+        )
 
     # ---------------------------------------------------------
     # Public API
@@ -81,8 +87,11 @@ class UpdateService:
             raise RuntimeError(f"Update file not found: {source_file}")
 
         installed_version_file = self._install_version(source_file, version)
-        self._update_current_symlink(installed_version_file)
-        self._ensure_launcher()
+        self._update_current_pointer(installed_version_file)
+
+        if not self.is_windows:
+            self._ensure_launcher()
+
         self._ensure_desktop_shortcut()
 
         self._log("Update installed.")
@@ -154,50 +163,125 @@ class UpdateService:
         self._log(f"Installed version file: {target_file}")
         return target_file
 
-    def _update_current_symlink(self, target: Path) -> None:
+    def _update_current_pointer(self, target: Path) -> None:
         """
-        Update ~/.s2t/app/current.pyz symlink to point to installed version.
+        Update managed current app pointer.
+
+        On Unix-like systems use symlink.
+        On Windows use file copy because symlink often requires elevated privileges.
         """
         self.app_dir.mkdir(parents=True, exist_ok=True)
 
         if self.current_link.exists() or self.current_link.is_symlink():
             self.current_link.unlink()
 
-        self.current_link.symlink_to(target)
-        self._log(f"Updated current symlink: {self.current_link} -> {target}")
+        if self.is_windows:
+            temp_file = self.app_dir / "current.new.pyz"
+            temp_file.write_bytes(target.read_bytes())
+            temp_file.replace(self.current_link)
+            self._log(f"Updated current file: {self.current_link}")
+        else:
+            self.current_link.symlink_to(target)
+            self._log(f"Updated current symlink: {self.current_link} -> {target}")
 
     def _ensure_launcher(self) -> None:
         """
-        Create/update stable launcher script:
-            ~/.s2t/s2t-tool.command
+        Create/update stable launcher script for Unix-like systems.
         """
         self.base_dir.mkdir(parents=True, exist_ok=True)
 
-        python_executable = os.environ.get("PYTHON_EXECUTABLE_OVERRIDE") or os.sys.executable or "/usr/bin/env python3"
+        python_executable = os.environ.get("PYTHON_EXECUTABLE_OVERRIDE") or sys.executable
+        if not python_executable:
+            python_executable = "python3"
 
-        script = (
+        content = (
             "#!/bin/bash\n"
-            f'exec "{python_executable}" "{self.current_link}"\n'
+            f"exec \"{python_executable}\" \"{self.current_link}\"\n"
         )
 
-        self.launcher_path.write_text(script, encoding="utf-8")
+        self.launcher_path.write_text(content, encoding="utf-8")
         self._chmod_if_possible(self.launcher_path, 0o755)
 
         self._log(f"Launcher ready: {self.launcher_path}")
 
     def _ensure_desktop_shortcut(self) -> None:
         """
-        Create/update desktop shortcut that points to launcher.
+        Create/update desktop shortcut.
         """
         desktop_dir = self.desktop_shortcut_path.parent
         if not desktop_dir.exists():
             self._log("Desktop directory not found. Skipping shortcut creation.")
             return
 
-        if self.desktop_shortcut_path.exists() or self.desktop_shortcut_path.is_symlink():
+        if self.is_windows:
+            self._create_windows_shortcut()
+        else:
+            if self.desktop_shortcut_path.exists() or self.desktop_shortcut_path.is_symlink():
+                self.desktop_shortcut_path.unlink()
+
+            self.desktop_shortcut_path.symlink_to(self.launcher_path)
+            self._log(f"Desktop shortcut ready: {self.desktop_shortcut_path}")
+
+    def _create_windows_shortcut(self) -> None:
+        """
+        Create Windows .lnk shortcut on Desktop via PowerShell.
+        No extra Python package is required.
+        """
+        if self.desktop_shortcut_path.exists():
             self.desktop_shortcut_path.unlink()
 
-        self.desktop_shortcut_path.symlink_to(self.launcher_path)
+        python_executable = os.environ.get("PYTHON_EXECUTABLE_OVERRIDE") or sys.executable
+        if not python_executable:
+            python_executable = "python"
+
+        target_path = str(Path(python_executable))
+        arguments = f'"{self.current_link}"'
+        working_directory = str(self.base_dir)
+        shortcut_path = str(self.desktop_shortcut_path)
+        icon_location = f"{target_path},0"
+
+        # Одинарные кавычки в PowerShell-строках нужно экранировать удвоением
+        def ps_escape(value: str) -> str:
+            return value.replace("'", "''")
+
+        ps_script = f"""
+$WshShell = New-Object -ComObject WScript.Shell
+$Shortcut = $WshShell.CreateShortcut('{ps_escape(shortcut_path)}')
+$Shortcut.TargetPath = '{ps_escape(target_path)}'
+$Shortcut.Arguments = '{ps_escape(arguments)}'
+$Shortcut.WorkingDirectory = '{ps_escape(working_directory)}'
+$Shortcut.IconLocation = '{ps_escape(icon_location)}'
+$Shortcut.Save()
+"""
+
+        result = subprocess.run(
+            [
+                "powershell",
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                ps_script,
+            ],
+            capture_output=True,
+            text=True,
+        )
+
+        stdout = result.stdout.strip()
+        stderr = result.stderr.strip()
+
+        if stdout:
+            self._log(stdout)
+        if stderr:
+            self._log(stderr)
+
+        if result.returncode != 0:
+            raise RuntimeError(
+                "Failed to create Windows shortcut.\n"
+                f"stdout:\n{stdout}\n"
+                f"stderr:\n{stderr}"
+            )
+
         self._log(f"Desktop shortcut ready: {self.desktop_shortcut_path}")
 
     # ---------------------------------------------------------
