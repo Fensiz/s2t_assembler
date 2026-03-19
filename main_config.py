@@ -73,7 +73,9 @@ def resolve_excel_output_dir(config: dict[str, Any]) -> Path:
     """
     Resolve directory where generated Excel files are written.
     """
-    return expand_user_path(config.get("excel_output_dir", "."))
+    path = expand_user_path(config.get("excel_output_dir", "."))
+    path.mkdir(parents=True, exist_ok=True)
+    return path
 
 
 def resolve_writer_config(config: dict[str, Any]) -> str:

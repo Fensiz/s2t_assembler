@@ -8,8 +8,7 @@ from pathlib import Path
 
 from InitialSetupService import InitialSetupService
 from UpdateService import UpdateService
-from main import handle_get, handle_put, load_app_config
-from main_config import resolve_excel_output_dir
+from main_config import resolve_excel_output_dir,load_app_config
 from ui_models import GetRequest, PutRequest
 from ui_recent_store import RecentItemsStore
 from ui_utils import (
@@ -241,6 +240,7 @@ class S2TApp:
         self.view.append_status(f"PUT completed for '{request.product_name}'")
 
     def _worker_get(self, request: GetRequest) -> None:
+        from main import handle_get
         handle_get(
             product_name=request.product_name,
             branch_arg=request.branch,
@@ -259,6 +259,7 @@ class S2TApp:
         self._call_in_ui(lambda: self._after_get_success(request, downloaded_file))
 
     def _worker_put(self, request: PutRequest) -> None:
+        from main import handle_put
         handle_put(
             product_name=request.product_name,
             branch_arg=request.branch,

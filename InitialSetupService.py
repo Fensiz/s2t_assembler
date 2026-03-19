@@ -9,6 +9,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+from dependency_manager import ensure_dependencies
+
 
 @dataclass
 class SetupState:
@@ -42,6 +44,8 @@ class InitialSetupService:
         if state.ssh_setup_prompt_shown:
             self._log("Initial setup already completed.")
             return
+
+        ensure_dependencies(logger=self.logger)
 
         self._ensure_known_host()
 
