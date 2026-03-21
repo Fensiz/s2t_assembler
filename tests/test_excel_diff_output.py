@@ -9,7 +9,7 @@ from openpyxl import Workbook
 from openpyxl.cell.rich_text import CellRichText, TextBlock
 
 from s2t_tool.infrastructure.excel_writer import build_rich_diff, maybe_build_rich_diff
-from s2t_tool.infrastructure.writer_style import append_csv_sheet
+from s2t_tool.infrastructure.writer_style import append_csv_sheet, finalize_sheet_style
 from s2t_tool.shared.csv_files import write_csv_rows
 
 
@@ -55,6 +55,24 @@ class ExcelDiffOutputTests(unittest.TestCase):
 
             sheet = wb["Settings"]
             self.assertIsInstance(sheet["A2"].value, CellRichText)
+
+    def test_finalize_sheet_style_adds_fill_for_diff_cells(self) -> None:
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Joins"
+        ws["A1"] = "Header"
+        ws["A2"] = build_rich_diff("before", "after")
+
+        finalize_sheet_style(
+            ws,
+            config={"global": {}},
+            sheet_name="Joins",
+            pre_transforms_sheet="Pre-transforms",
+            joins_sheet="Joins",
+            mappings_sheet="Mappings",
+        )
+
+        self.assertEqual(ws["A2"].fill.fill_type, "solid")
 
     def test_saved_rich_text_uses_opaque_argb_colors(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

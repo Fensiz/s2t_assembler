@@ -329,6 +329,18 @@ def apply_alternating_group_fill(sheet: Worksheet, cfg: dict[str, Any]) -> None:
             fill_row(sheet, row_idx, alt_color)
 
 
+def apply_diff_cell_fill(sheet: Worksheet, cfg: dict[str, Any]) -> None:
+    diff_fill = color_fill(cfg.get("diff_fill_color", "FFF6D5"))
+    if diff_fill is None:
+        return
+
+    header_rows = cfg.get("header_rows", 1)
+    for row in sheet.iter_rows(min_row=header_rows + 1, max_row=sheet.max_row):
+        for cell in row:
+            if isinstance(cell.value, CellRichText):
+                cell.fill = diff_fill
+
+
 def finalize_sheet_style(
     sheet: Worksheet,
     config: dict[str, Any],
@@ -348,6 +360,7 @@ def finalize_sheet_style(
     apply_freeze_panes(sheet, cfg)
     apply_autofilter(sheet, cfg)
     apply_alternating_group_fill(sheet, cfg)
+    apply_diff_cell_fill(sheet, cfg)
     if cfg.get("apply_global_borders", True):
         apply_cell_borders(sheet)
 
