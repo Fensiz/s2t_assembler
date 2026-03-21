@@ -7,16 +7,16 @@ from s2t_tool.application.commands import GetCommand, PutCommand
 from s2t_tool.application.service import S2TService
 from s2t_tool.domain.branching import is_commit_ref
 from s2t_tool.infrastructure.config import load_app_config, resolve_excel_output_dir
+from s2t_tool.infrastructure.excel_artifacts import find_latest_excel_file
 from s2t_tool.infrastructure.initial_setup import InitialSetupService
-from s2t_tool.infrastructure.update_service import UpdateService
-from s2t_tool.presentation.models import GetRequest, PutRequest
-from s2t_tool.presentation.recent_store import RecentItemsStore
-from s2t_tool.presentation.utils import (
-    find_latest_excel_file,
+from s2t_tool.infrastructure.os_runtime import (
     open_directory_in_os,
     open_file_in_os,
     run_in_thread,
 )
+from s2t_tool.infrastructure.recent_store import RecentItemsStore
+from s2t_tool.infrastructure.update_service import UpdateService
+from s2t_tool.presentation.form_models import GetRequest, PutRequest
 from s2t_tool.presentation.view import S2TView
 
 

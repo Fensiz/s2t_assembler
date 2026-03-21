@@ -50,17 +50,17 @@ class ServiceCommitRefTests(unittest.TestCase):
                 logger=None,
             )
 
-            with patch("s2t_tool.application.service.ensure_repo") as ensure_repo_mock, \
-                patch("s2t_tool.application.service.export_commit_tree") as export_commit_tree_mock, \
-                patch("s2t_tool.application.service.build_excel_from_repo") as build_excel_from_repo_mock:
+            with patch("s2t_tool.application.use_cases.get_s2t.ensure_repo") as ensure_repo_mock, \
+                patch("s2t_tool.application.use_cases.get_s2t.export_commit_tree") as export_commit_tree_mock, \
+                patch("s2t_tool.application.use_cases.get_s2t.build_excel_from_repo") as build_excel_from_repo_mock:
                 export_commit_tree_mock.side_effect = lambda repo_dir, commit_ref, target_dir: None
 
                 original_resolve_repo_data_dir = __import__(
-                    "s2t_tool.application.service", fromlist=["resolve_repo_data_dir"]
+                    "s2t_tool.application.use_cases.get_s2t", fromlist=["resolve_repo_data_dir"]
                 ).resolve_repo_data_dir
 
                 with patch(
-                    "s2t_tool.application.service.resolve_repo_data_dir",
+                    "s2t_tool.application.use_cases.get_s2t.resolve_repo_data_dir",
                     side_effect=lambda cfg, repo_dir: repo_data_dir if Path(repo_dir) == exported_root else original_resolve_repo_data_dir(cfg, repo_dir),
                 ):
                     with patch(

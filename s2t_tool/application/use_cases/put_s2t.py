@@ -1,0 +1,119 @@
+from __future__ import annotations
+
+import tempfile
+from pathlib import Path
+
+from s2t_tool.application.commands import PutCommand
+from s2t_tool.domain.branching import is_commit_ref, resolve_branch
+from s2t_tool.domain.file_naming import ensure_put_compatible_excel, rename_excel_after_put, resolve_input_excel_path
+from s2t_tool.domain.versioning import VERSION_JSON, resolve_put_version, write_repo_version
+from s2t_tool.infrastructure.config import resolve_repo_data_dir, resolve_repo_dir, resolve_repo_url
+from s2t_tool.infrastructure.excel_reader import export_excel_to_repo
+from s2t_tool.infrastructure.git_repo import (
+    commit_and_push,
+    ensure_repo,
+    has_changes_excluding,
+    replace_directory_contents,
+)
+
+
+class PutS2TUseCase:
+    def execute(self, command: PutCommand) -> None:
+        if is_commit_ref(command.branch_arg):
+            raise ValueError("PUT requires a branch name. Commit hash can be used only for GET.")
+
+        branch = resolve_branch(command.config, command.branch_arg)
+        base_branch = str(command.config.get("default_branch", "master")).strip()
+        repo_url = resolve_repo_url(command.config, command.product_name)
+        repo_dir = resolve_repo_dir(command.config, command.product_name)
+
+        if command.logger:
+            command.logger(f"Preparing repository: {repo_url}")
+            command.logger(f"Branch: {branch}")
+
+        ensure_repo(repo_url, repo_dir, branch, base_branch, logger=command.logger)
+
+        repo_data_dir = resolve_repo_data_dir(command.config, repo_dir)
+        version_path = repo_data_dir / VERSION_JSON
+        input_excel = resolve_input_excel_path(
+            config=command.config,
+            product_name=command.product_name,
+            explicit_excel=command.excel_arg,
+            explicit_version=command.version_arg,
+            branch=branch,
+        )
+
+        if not input_excel.exists():
+            raise ValueError(f"Excel file not found: {input_excel}")
+
+        ensure_put_compatible_excel(input_excel)
+
+        if command.logger:
+            command.logger(f"Reading Excel: {input_excel}")
+            command.logger("Exporting Excel into staging directory...")
+
+        repo_data_dir.parent.mkdir(parents=True, exist_ok=True)
+
+        with tempfile.TemporaryDirectory(prefix="s2t_put_", dir=str(repo_data_dir.parent)) as temp_dir:
+            staged_repo_data_dir = Path(temp_dir) / repo_data_dir.name
+            staged_repo_data_dir.mkdir(parents=True, exist_ok=True)
+
+            export_excel_to_repo(
+                excel_path=str(input_excel),
+                output_dir=str(staged_repo_data_dir),
+                logger=command.logger,
+            )
+
+            if command.logger:
+                command.logger("Replacing repo data directory with staged export...")
+
+            preserved_names = {".git"} if repo_data_dir == repo_dir else set()
+            replace_directory_contents(
+                path=repo_data_dir,
+                replacement_dir=staged_repo_data_dir,
+                preserved_names=preserved_names,
+            )
+
+        version_rel_path = version_path.relative_to(repo_dir)
+        if not has_changes_excluding(repo_dir, excluded_paths=[version_rel_path]):
+            if command.logger:
+                command.logger("No content changes detected. Version was not bumped.")
+                command.logger("Nothing to commit.")
+            print("No content changes detected. Nothing to commit.")
+            return
+
+        new_version = resolve_put_version(
+            version_arg=command.version_arg,
+            input_excel=input_excel,
+            product_name=command.product_name,
+            version_path=version_path,
+        )
+        write_repo_version(version_path, new_version)
+
+        commit_message = (
+            command.commit_message_arg.strip()
+            if command.commit_message_arg and command.commit_message_arg.strip()
+            else f"Update S2T for {command.product_name} to version {new_version}"
+        )
+
+        if command.logger:
+            command.logger("Committing and pushing changes...")
+
+        commit_and_push(repo_dir=repo_dir, branch=branch, message=commit_message, logger=command.logger)
+
+        rename_excel_after_put(
+            input_excel=input_excel,
+            product_name=command.product_name,
+            new_version=new_version,
+            branch=branch,
+            default_branch=base_branch,
+            logger=command.logger,
+        )
+
+        if command.logger:
+            command.logger(f"Repo updated: {repo_dir}")
+            command.logger(f"New version: {new_version}")
+
+        print(f"Repo updated: {repo_dir}")
+        print(f"New version: {new_version}")
+

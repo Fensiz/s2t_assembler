@@ -6,14 +6,11 @@ from typing import Any, Callable
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font
 
-from s2t_tool.infrastructure.common import (
-    JOIN_SOURCE_SQL,
-    load_json_resource,
-    normalize_newlines,
-    read_csv_rows,
-    read_json_file,
-    read_text_file,
-)
+from s2t_tool.shared.constants import JOIN_SOURCE_SQL
+from s2t_tool.shared.csv_files import read_csv_rows
+from s2t_tool.shared.files import read_json_file, read_text_file
+from s2t_tool.shared.resources import load_json_resource
+from s2t_tool.shared.text import normalize_newlines
 
 
 def build_pre_transforms_sheet(

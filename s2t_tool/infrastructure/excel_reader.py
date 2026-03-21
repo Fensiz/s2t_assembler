@@ -9,16 +9,14 @@ from openpyxl.workbook.workbook import Workbook
 from openpyxl.worksheet.worksheet import Worksheet
 
 from s2t_tool.domain.schema import DEFAULT_SCHEMA, S2TSchema
-from s2t_tool.infrastructure.common import (
-    ensure_dir,
+from s2t_tool.shared.csv_files import write_csv_rows
+from s2t_tool.shared.files import ensure_dir, write_json_file, write_text_file
+from s2t_tool.shared.text import (
     excel_to_repo_header,
     is_row_empty,
     normalize_cell,
     slugify_dir_name,
     split_lines,
-    write_csv_rows,
-    write_json_file,
-    write_text_file,
 )
 
 

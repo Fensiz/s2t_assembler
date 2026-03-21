@@ -9,7 +9,8 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import column_index_from_string, get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
-from s2t_tool.infrastructure.common import load_json_resource, read_csv_rows
+from s2t_tool.shared.csv_files import read_csv_rows
+from s2t_tool.shared.resources import load_json_resource
 
 
 WRITER_CONFIG_FILE = "writer_config.json"

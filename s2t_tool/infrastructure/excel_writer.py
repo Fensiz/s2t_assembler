@@ -11,7 +11,6 @@ from openpyxl.styles import Font
 from openpyxl.worksheet.worksheet import Worksheet
 
 from s2t_tool.domain.schema import DEFAULT_SCHEMA, S2TSchema
-from s2t_tool.infrastructure.common import read_json_file
 from s2t_tool.infrastructure.writer_style import (
     WRITER_CONFIG_FILE,
     apply_table_borders,
@@ -27,6 +26,7 @@ from s2t_tool.infrastructure.writer_sections import (
     build_pre_transforms_sheet as build_pre_transforms_sheet_section,
     resolve_attribute_name,
 )
+from s2t_tool.shared.files import read_json_file
 
 
 SCHEMA = DEFAULT_SCHEMA
