@@ -25,6 +25,12 @@ class ExcelDiffOutputTests(unittest.TestCase):
     def test_non_diff_mode_returns_new_text(self) -> None:
         self.assertEqual(maybe_build_rich_diff(False, "before", "after"), "after")
 
+    def test_sql_like_change_produces_rich_text(self) -> None:
+        old = "when x in ('a','b') then 1\nwhen x = 'c' then 2"
+        new = "when x = 'a' then 1\nwhen x in ('b','c') then 2"
+        result = build_rich_diff(old, new)
+        self.assertIsInstance(result, CellRichText)
+
     def test_append_csv_sheet_highlights_changed_data_cells(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             current = Path(temp_dir) / "current.csv"

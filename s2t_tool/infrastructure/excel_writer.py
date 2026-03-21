@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from difflib import SequenceMatcher
 from pathlib import Path
+import re
 from typing import Any
 
 from openpyxl import Workbook
@@ -70,12 +71,14 @@ def build_rich_diff(old_text: str | None, new_text: str | None) -> CellRichText 
     if old_value == new_value:
         return new_value
 
-    matcher = SequenceMatcher(a=old_value, b=new_value)
+    old_tokens = _diff_tokens(old_value)
+    new_tokens = _diff_tokens(new_value)
+    matcher = SequenceMatcher(a=old_tokens, b=new_tokens)
     rich = CellRichText()
 
     for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-        old_chunk = old_value[i1:i2]
-        new_chunk = new_value[j1:j2]
+        old_chunk = "".join(old_tokens[i1:i2])
+        new_chunk = "".join(new_tokens[j1:j2])
 
         if tag == "equal":
             if old_chunk:
@@ -93,6 +96,15 @@ def build_rich_diff(old_text: str | None, new_text: str | None) -> CellRichText 
                 rich.append(TextBlock(GREEN_FONT, new_chunk))
 
     return rich
+
+
+def _diff_tokens(value: str) -> list[str]:
+    if "\n" in value:
+        return value.splitlines(keepends=True)
+
+    token_re = re.compile(r"'[^']*'|\s+|[(),]|[^\s(),]+")
+    tokens = token_re.findall(value)
+    return tokens or [value]
 
 
 def maybe_build_rich_diff(

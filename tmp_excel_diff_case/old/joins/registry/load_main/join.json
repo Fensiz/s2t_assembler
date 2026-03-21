@@ -1,0 +1,14 @@
+{
+  "description": "Old registry join",
+  "table_codes": [
+    "reg"
+  ],
+  "table_codes_to_track_delta": [
+    "reg"
+  ],
+  "load_code_params": [
+    "p=1"
+  ],
+  "history_rule": "old_rule",
+  "business_history_dates": "2020-01-01"
+}

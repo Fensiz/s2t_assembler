@@ -1,0 +1,2 @@
+attribute_code,mapping_algorithm
+rule_sql,"when x = 'a' then 1\nwhen x in ('b','c') then 2"
