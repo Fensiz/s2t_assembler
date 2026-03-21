@@ -36,7 +36,7 @@ class S2TView:
         if self.is_aqua:
             self.root.tk.call("tk", "scaling", 1.15)
 
-        self.open_after_get_var = tk.BooleanVar(value=False)
+        self.open_after_get_var = tk.BooleanVar(value=True)
         self.keep_version_var = tk.BooleanVar(value=False)
 
         self.product_entry: tk.Entry | None = None
@@ -182,7 +182,8 @@ class S2TView:
         body.grid_columnconfigure(0, weight=1)
 
         toolbar = tk.Frame(body, bg=self.PANEL_BG)
-        toolbar.grid(row=0, column=0, sticky="n")
+        toolbar.grid(row=0, column=0, sticky="ew")
+        toolbar.grid_columnconfigure(0, weight=1)
 
         self.get_button = tk.Button(
             toolbar,
@@ -194,7 +195,7 @@ class S2TView:
             cursor="hand2",
             **self._button_style("#ccefe8", "#b7e6dc"),
         )
-        self.get_button.pack(fill="x")
+        self.get_button.grid(row=0, column=0, sticky="ew")
 
         self.put_button = tk.Button(
             toolbar,
@@ -206,7 +207,7 @@ class S2TView:
             cursor="hand2",
             **self._button_style("#dbeafe", "#bfdbfe"),
         )
-        self.put_button.pack(fill="x", pady=(6, 0))
+        self.put_button.grid(row=1, column=0, sticky="ew", pady=(6, 0))
 
         self.open_folder_button = tk.Button(
             toolbar,
@@ -217,7 +218,7 @@ class S2TView:
             cursor="hand2",
             **self._button_style("#e2e8f0", "#cbd5e1"),
         )
-        self.open_folder_button.pack(fill="x", pady=(6, 0))
+        self.open_folder_button.grid(row=2, column=0, sticky="ew", pady=(6, 0))
 
         tk.Checkbutton(
             body,
