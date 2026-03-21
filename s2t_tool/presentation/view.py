@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import tkinter as tk
+import tkinter.font as tkfont
 from tkinter import messagebox
 from typing import Any, Callable
 
@@ -22,13 +23,18 @@ class S2TView:
     STATUS_BG = "#0f172a"
     STATUS_TEXT = "#e2e8f0"
 
-    def __init__(self, root: tk.Tk) -> None:
-        self.language = detect_language()
+    def __init__(self, root: tk.Tk, language: str | None = None) -> None:
+        self.language = detect_language(language)
         self.root = root
+        self.windowing_system = str(self.root.tk.call("tk", "windowingsystem")).lower()
+        self.is_aqua = self.windowing_system == "aqua"
         self.root.title(tr("app_title", self.language))
         self.root.geometry("640x500")
         self.root.minsize(620, 460)
         self.root.configure(bg=self.BG)
+
+        if self.is_aqua:
+            self.root.tk.call("tk", "scaling", 1.15)
 
         self.open_after_get_var = tk.BooleanVar(value=False)
         self.keep_version_var = tk.BooleanVar(value=False)
@@ -53,12 +59,24 @@ class S2TView:
         self.build()
 
     def _build_fonts(self) -> None:
-        self.section_font = ("Helvetica", 8, "bold")
-        self.label_font = ("Helvetica", 8, "bold")
-        self.body_font = ("Helvetica", 8)
-        self.button_font = ("Helvetica", 8, "bold")
-        self.status_font = ("Menlo", 8)
-        self.version_font = ("Helvetica", 8, "bold")
+        base_size = 11 if self.is_aqua else 8
+        status_size = 10 if self.is_aqua else 8
+
+        default_font = tkfont.nametofont("TkDefaultFont").copy()
+        default_font.configure(size=base_size)
+
+        bold_font = tkfont.nametofont("TkDefaultFont").copy()
+        bold_font.configure(size=base_size, weight="bold")
+
+        version_font = tkfont.nametofont("TkDefaultFont").copy()
+        version_font.configure(size=max(base_size - 1, 8), weight="bold")
+
+        self.section_font = bold_font
+        self.label_font = bold_font
+        self.body_font = default_font
+        self.button_font = bold_font
+        self.status_font = ("Menlo", status_size)
+        self.version_font = version_font
 
     def build(self) -> None:
         shell = tk.Frame(self.root, bg=self.BG)
@@ -170,16 +188,11 @@ class S2TView:
             toolbar,
             text=tr("get_export", self.language),
             width=10,
-            bg="#ccefe8",
-            fg=self.BUTTON_TEXT,
-            activebackground="#b7e6dc",
-            activeforeground=self.BUTTON_TEXT,
-            relief="flat",
-            bd=0,
             font=self.button_font,
             padx=6,
             pady=4,
             cursor="hand2",
+            **self._button_style("#ccefe8", "#b7e6dc"),
         )
         self.get_button.pack(fill="x")
 
@@ -187,32 +200,22 @@ class S2TView:
             toolbar,
             text=tr("put_publish", self.language),
             width=10,
-            bg="#dbeafe",
-            fg=self.BUTTON_TEXT,
-            activebackground="#bfdbfe",
-            activeforeground=self.BUTTON_TEXT,
-            relief="flat",
-            bd=0,
             font=self.button_font,
             padx=6,
             pady=4,
             cursor="hand2",
+            **self._button_style("#dbeafe", "#bfdbfe"),
         )
         self.put_button.pack(fill="x", pady=(6, 0))
 
         self.open_folder_button = tk.Button(
             toolbar,
             text=tr("open_excel_folder", self.language),
-            bg="#e2e8f0",
-            fg=self.TEXT,
-            activebackground="#cbd5e1",
-            activeforeground=self.TEXT,
-            relief="flat",
-            bd=0,
             font=self.button_font,
             padx=6,
             pady=4,
             cursor="hand2",
+            **self._button_style("#e2e8f0", "#cbd5e1"),
         )
         self.open_folder_button.pack(fill="x", pady=(6, 0))
 
@@ -324,6 +327,27 @@ class S2TView:
             font=self.body_font,
             width=width,
         )
+
+    def _button_style(self, background: str, active_background: str) -> dict[str, object]:
+        if self.is_aqua:
+            return {
+                "bg": "#f4f4f4",
+                "fg": self.TEXT,
+                "activebackground": "#eaeaea",
+                "activeforeground": self.TEXT,
+                "relief": "raised",
+                "bd": 1,
+                "highlightthickness": 0,
+            }
+
+        return {
+            "bg": background,
+            "fg": self.BUTTON_TEXT,
+            "activebackground": active_background,
+            "activeforeground": self.BUTTON_TEXT,
+            "relief": "flat",
+            "bd": 0,
+        }
 
     def _mark_optional_entry(self, entry: tk.Entry) -> None:
         entry.configure(bg=self.OPTIONAL_INPUT_BG)

@@ -6,5 +6,6 @@
   "writer_config": "writer_config.json",
   "repo_data_subdir": "resources/s2t",
   "pyz_repo": "s2t-tools-pyz",
-  "pyz_branch": "master"
+  "pyz_branch": "master",
+  "language": "ru"
 }

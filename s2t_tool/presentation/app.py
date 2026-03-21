@@ -26,13 +26,13 @@ from s2t_tool.presentation.view import S2TView
 
 class S2TApp:
     def __init__(self) -> None:
-        self.language = detect_language()
         self.config = load_app_config()
+        self.language = detect_language(self.config.get("language"))
         self.recent_store = RecentItemsStore()
         self.service = S2TService()
 
         self.root = tk.Tk()
-        self.view = S2TView(self.root)
+        self.view = S2TView(self.root, language=self.language)
 
         self.update_service = UpdateService(
             self.config,

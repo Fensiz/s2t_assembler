@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import locale
+import os
 import re
 
 
@@ -110,12 +111,35 @@ STRINGS: dict[str, dict[str, str]] = {
 }
 
 
-def detect_language() -> str:
-    language, _encoding = locale.getlocale()
-    normalized = (language or "").lower()
-    if normalized.startswith("ru"):
-        return "ru"
-    return "en"
+def detect_language(preferred: str | None = None) -> str:
+    candidates = [
+        preferred,
+        os.environ.get("S2T_TOOL_LANG"),
+        os.environ.get("LC_ALL"),
+        os.environ.get("LC_MESSAGES"),
+        os.environ.get("LANG"),
+    ]
+
+    try:
+        language, _encoding = locale.getlocale()
+        candidates.append(language)
+    except Exception:
+        pass
+
+    try:
+        language, _encoding = locale.getdefaultlocale()
+        candidates.append(language)
+    except Exception:
+        pass
+
+    for candidate in candidates:
+        normalized = str(candidate or "").lower()
+        if normalized.startswith("ru"):
+            return "ru"
+        if normalized.startswith("en"):
+            return "en"
+
+    return "ru"
 
 
 def tr(key: str, language: str, **kwargs: object) -> str:
