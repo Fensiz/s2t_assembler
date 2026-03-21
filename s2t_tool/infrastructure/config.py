@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from common import load_json_resource
+from s2t_tool.infrastructure.common import load_json_resource
 
 
 APP_CONFIG_FILE = "app_config.json"

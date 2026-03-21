@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from app_info import APP_VERSION
+from s2t_tool.app_info import APP_VERSION
 
 
 class UpdateService:

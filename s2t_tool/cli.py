@@ -3,9 +3,9 @@ from __future__ import annotations
 import argparse
 from typing import Any
 
-from main_config import load_app_config
-from main_models import GetCommand, PutCommand
-from main_service import S2TService
+from s2t_tool.application.commands import GetCommand, PutCommand
+from s2t_tool.application.service import S2TService
+from s2t_tool.infrastructure.config import load_app_config
 
 _service = S2TService()
 
@@ -51,18 +51,10 @@ def handle_put(
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """
-    Build CLI argument parser.
-    """
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--config",
-        default=None,
-        help="Path to app config json",
-    )
+    parser.add_argument("--config", default=None, help="Path to app config json")
 
     subparsers = parser.add_subparsers(dest="command", required=True)
-
     get_parser = subparsers.add_parser("get")
     get_parser.add_argument("product_name")
     get_parser.add_argument("--branch", default=None)
@@ -74,41 +66,15 @@ def build_parser() -> argparse.ArgumentParser:
     put_parser.add_argument("--version", default=None)
     put_parser.add_argument("--excel", default=None)
     put_parser.add_argument("--message", default=None)
-
     return parser
 
 
 def main() -> None:
-    """
-    CLI entry point.
-
-    Commands:
-        get <product_name>
-        put <product_name>
-    """
     parser = build_parser()
     args = parser.parse_args()
     config = load_app_config(args.config)
 
     if args.command == "get":
-        handle_get(
-            product_name=args.product_name,
-            branch_arg=args.branch,
-            diff_commit_arg=args.diff_commit,
-            config=config,
-            logger=None,
-        )
+        handle_get(args.product_name, args.branch, args.diff_commit, config=config, logger=None)
     elif args.command == "put":
-        handle_put(
-            product_name=args.product_name,
-            branch_arg=args.branch,
-            version_arg=args.version,
-            excel_arg=args.excel,
-            commit_message_arg=args.message,
-            config=config,
-            logger=None,
-        )
-
-
-if __name__ == "__main__":
-    main()
+        handle_put(args.product_name, args.branch, args.version, args.excel, args.message, config=config, logger=None)

@@ -4,8 +4,8 @@ import tkinter as tk
 from tkinter import messagebox
 from typing import Callable, Any
 
-from app_info import APP_VERSION
-from ui_models import GetRequest, PutRequest
+from s2t_tool.app_info import APP_VERSION
+from s2t_tool.presentation.models import GetRequest, PutRequest
 
 
 class S2TView:

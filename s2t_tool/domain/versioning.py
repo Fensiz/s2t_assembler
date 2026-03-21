@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from common import read_json_file, write_json_file
-from main_files import parse_version_from_excel_filename
+from s2t_tool.domain.file_naming import parse_version_from_excel_filename
+from s2t_tool.infrastructure.common import read_json_file, write_json_file
 
 
 VERSION_JSON = "version.json"

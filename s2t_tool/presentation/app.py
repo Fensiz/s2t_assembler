@@ -1,29 +1,29 @@
 from __future__ import annotations
 
-import shutil
-import subprocess
-import sys
 import tkinter as tk
 from pathlib import Path
 
-from InitialSetupService import InitialSetupService
-from UpdateService import UpdateService
-from main_config import resolve_excel_output_dir,load_app_config
-from ui_models import GetRequest, PutRequest
-from ui_recent_store import RecentItemsStore
-from ui_utils import (
+from s2t_tool.application.commands import GetCommand, PutCommand
+from s2t_tool.application.service import S2TService
+from s2t_tool.infrastructure.config import load_app_config, resolve_excel_output_dir
+from s2t_tool.infrastructure.initial_setup import InitialSetupService
+from s2t_tool.infrastructure.update_service import UpdateService
+from s2t_tool.presentation.models import GetRequest, PutRequest
+from s2t_tool.presentation.recent_store import RecentItemsStore
+from s2t_tool.presentation.utils import (
     find_latest_excel_file,
     open_directory_in_os,
     open_file_in_os,
     run_in_thread,
 )
-from ui_view import S2TView
+from s2t_tool.presentation.view import S2TView
 
 
 class S2TApp:
     def __init__(self) -> None:
         self.config = load_app_config()
         self.recent_store = RecentItemsStore()
+        self.service = S2TService()
 
         self.root = tk.Tk()
         self.view = S2TView(self.root)
@@ -240,13 +240,14 @@ class S2TApp:
         self.view.append_status(f"PUT completed for '{request.product_name}'")
 
     def _worker_get(self, request: GetRequest) -> None:
-        from main import handle_get
-        handle_get(
-            product_name=request.product_name,
-            branch_arg=request.branch,
-            diff_commit_arg=request.diff_commit,
-            config=self.config,
-            logger=self._ui_logger,
+        self.service.handle_get(
+            GetCommand(
+                product_name=request.product_name,
+                branch_arg=request.branch,
+                diff_commit_arg=request.diff_commit,
+                config=self.config,
+                logger=self._ui_logger,
+            )
         )
 
         excel_dir = resolve_excel_output_dir(self.config)
@@ -259,15 +260,16 @@ class S2TApp:
         self._call_in_ui(lambda: self._after_get_success(request, downloaded_file))
 
     def _worker_put(self, request: PutRequest) -> None:
-        from main import handle_put
-        handle_put(
-            product_name=request.product_name,
-            branch_arg=request.branch,
-            version_arg=request.version,
-            excel_arg=None,
-            commit_message_arg=request.commit_message,
-            config=self.config,
-            logger=self._ui_logger,
+        self.service.handle_put(
+            PutCommand(
+                product_name=request.product_name,
+                branch_arg=request.branch,
+                version_arg=request.version,
+                excel_arg=None,
+                commit_message_arg=request.commit_message,
+                config=self.config,
+                logger=self._ui_logger,
+            )
         )
 
         self._call_in_ui(lambda: self._after_put_success(request))
@@ -401,3 +403,12 @@ class S2TApp:
             )
             self._append_status_ui(f"Ошибка обновления: {error_text}")
             self._call_in_ui(lambda: self.view.set_action_buttons_enabled(True))
+
+
+def main_ui() -> None:
+    app = S2TApp()
+    app.root.mainloop()
+
+
+if __name__ == "__main__":
+    main_ui()

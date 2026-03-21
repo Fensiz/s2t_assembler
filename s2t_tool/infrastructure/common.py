@@ -13,9 +13,16 @@ PACKAGE_NAME = "s2t_tool"
 
 def load_text_resource(filename: str) -> str:
     # 1. обычный запуск из файловой системы
-    file_path = Path(__file__).resolve().parent / filename
-    if file_path.exists():
-        return file_path.read_text(encoding="utf-8")
+    module_dir = Path(__file__).resolve().parent
+    search_dirs = [
+        module_dir,
+        module_dir.parent,
+        module_dir.parent.parent,
+    ]
+    for base_dir in search_dirs:
+        file_path = base_dir / filename
+        if file_path.exists():
+            return file_path.read_text(encoding="utf-8")
 
     # 2. запуск из zipapp (.pyz)
     archive_path = Path(sys.argv[0]).resolve()
@@ -115,26 +122,3 @@ def excel_to_repo_header(name: str) -> str:
     if normalized == "is_a_key":
         return "is_key"
     return normalized
-
-def read_repo_version(version_path: Path) -> str:
-    payload = read_json_file(version_path, default={}) or {}
-    return str(payload.get("version", "0.0.0.0"))
-
-
-def write_repo_version(version_path: Path, version: str) -> None:
-    payload = read_json_file(version_path, default={}) or {}
-    payload["version"] = version
-    write_json_file(version_path, payload)
-
-def bump_version(version: str) -> str:
-    parts = [p.strip() for p in version.split(".") if p.strip()]
-    if not parts:
-        return "1"
-
-    try:
-        numbers = [int(p) for p in parts]
-    except ValueError:
-        raise ValueError(f"Invalid version format: {version}")
-
-    numbers[-1] += 1
-    return ".".join(str(n) for n in numbers)

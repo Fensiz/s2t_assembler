@@ -1,0 +1,13 @@
+.build/
+.build_py/
+.pytest_cache/
+.venv/
+__pycache__/
+*.py[cod]
+dist/
+output.xlsx
+repo/
+tests/__pycache__/
+S2T_USL_*.xlsx
+USL_S2T_*.xlsx
+.DS_Store

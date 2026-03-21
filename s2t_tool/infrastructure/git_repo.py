@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import tarfile
+import tempfile
+import uuid
 from io import BytesIO
 from pathlib import Path
 
@@ -111,6 +114,62 @@ def clear_directory_contents(path: Path) -> None:
             shutil.rmtree(child)
         else:
             child.unlink()
+
+
+def replace_directory_contents(
+    path: Path,
+    replacement_dir: Path,
+    preserved_names: set[str] | None = None,
+) -> None:
+    """
+    Replace directory contents with staged contents.
+
+    Existing files that are absent in `replacement_dir` are removed.
+    If replacement fails, restore the original contents.
+    """
+    path.mkdir(parents=True, exist_ok=True)
+
+    if not replacement_dir.exists() or not replacement_dir.is_dir():
+        raise ValueError(f"Replacement directory does not exist: {replacement_dir}")
+
+    preserved = preserved_names or set()
+    backup_dir = Path(
+        tempfile.mkdtemp(
+            prefix=f".{path.name}.backup-{uuid.uuid4().hex[:8]}-",
+            dir=path.parent,
+        )
+    )
+
+    moved_out: list[tuple[Path, Path]] = []
+    moved_in: list[tuple[Path, Path]] = []
+
+    try:
+        for child in list(path.iterdir()):
+            if child.name in preserved:
+                continue
+            backup_path = backup_dir / child.name
+            os.replace(child, backup_path)
+            moved_out.append((child, backup_path))
+
+        for child in list(replacement_dir.iterdir()):
+            target_path = path / child.name
+            os.replace(child, target_path)
+            moved_in.append((target_path, replacement_dir / child.name))
+    except Exception:
+        for target_path, staged_path in reversed(moved_in):
+            if target_path.exists():
+                os.replace(target_path, staged_path)
+
+        for original_path, backup_path in reversed(moved_out):
+            if backup_path.exists():
+                os.replace(backup_path, original_path)
+
+        raise
+    finally:
+        if replacement_dir.exists():
+            shutil.rmtree(replacement_dir, ignore_errors=True)
+        if backup_dir.exists():
+            shutil.rmtree(backup_dir, ignore_errors=True)
 
 
 def clear_worktree_except_git(repo_dir: Path) -> None:

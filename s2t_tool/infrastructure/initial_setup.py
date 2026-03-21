@@ -9,7 +9,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from dependency_manager import ensure_dependencies
+from s2t_tool.infrastructure.dependency_manager import ensure_dependencies
 
 
 @dataclass

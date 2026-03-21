@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from common import read_json_file, write_json_file
+from s2t_tool.infrastructure.common import read_json_file, write_json_file
 
 
 RECENT_ITEMS_FILE = Path("~/.s2t/recent_items.json").expanduser()

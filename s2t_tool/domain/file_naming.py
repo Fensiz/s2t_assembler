@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from main_branching import is_debug_branch
+from s2t_tool.domain.branching import is_debug_branch
 
 
 def build_branch_excel_filename(product_name: str, version: str, debug_mode: bool) -> str:
@@ -71,7 +71,7 @@ def resolve_input_excel_path(
     """
     Resolve Excel file to use for PUT.
     """
-    from main_config import resolve_excel_output_dir
+    from s2t_tool.infrastructure.config import resolve_excel_output_dir
 
     if explicit_excel:
         return Path(explicit_excel).expanduser().resolve()

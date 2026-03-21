@@ -3,18 +3,22 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-from git_repo import (
-    clear_directory_contents,
-    commit_and_push,
-    ensure_repo,
-    export_commit_tree,
-    has_changes_excluding,
+from s2t_tool.application.commands import GetCommand, PutCommand
+from s2t_tool.domain.branching import is_debug_branch, resolve_branch
+from s2t_tool.domain.file_naming import (
+    build_branch_diff_excel_filename,
+    build_branch_excel_filename,
+    ensure_not_diff_excel,
+    rename_excel_after_put,
+    resolve_input_excel_path,
 )
-from reader import export_excel_to_repo
-from writer import build_excel_from_repo
-
-from main_branching import is_debug_branch, resolve_branch
-from main_config import (
+from s2t_tool.domain.versioning import (
+    VERSION_JSON,
+    read_repo_version,
+    resolve_put_version,
+    write_repo_version,
+)
+from s2t_tool.infrastructure.config import (
     ensure_excel_output_dir,
     resolve_excel_output_dir,
     resolve_repo_data_dir,
@@ -22,15 +26,15 @@ from main_config import (
     resolve_repo_url,
     resolve_writer_config,
 )
-from main_files import (
-    build_branch_diff_excel_filename,
-    build_branch_excel_filename,
-    ensure_not_diff_excel,
-    rename_excel_after_put,
-    resolve_input_excel_path,
+from s2t_tool.infrastructure.excel_reader import export_excel_to_repo
+from s2t_tool.infrastructure.excel_writer import build_excel_from_repo
+from s2t_tool.infrastructure.git_repo import (
+    commit_and_push,
+    ensure_repo,
+    export_commit_tree,
+    has_changes_excluding,
+    replace_directory_contents,
 )
-from main_models import GetCommand, PutCommand
-from main_versioning import VERSION_JSON, read_repo_version, resolve_put_version, write_repo_version
 
 
 class S2TService:
@@ -94,6 +98,7 @@ class S2TService:
                     config_path=writer_config,
                     diff_repo_dir=diff_repo_dir,
                     diff_commit=command.diff_commit_arg,
+                    logger=command.logger,
                 )
         else:
             if command.logger:
@@ -105,6 +110,7 @@ class S2TService:
                 config_path=writer_config,
                 diff_repo_dir=None,
                 diff_commit=None,
+                logger=command.logger,
             )
 
         if command.logger:
@@ -145,17 +151,32 @@ class S2TService:
 
         if command.logger:
             command.logger(f"Reading Excel: {input_excel}")
-            command.logger("Clearing repo data directory...")
+            command.logger("Exporting Excel into staging directory...")
 
-        clear_directory_contents(repo_data_dir)
+        repo_data_dir.parent.mkdir(parents=True, exist_ok=True)
 
-        if command.logger:
-            command.logger("Exporting Excel into repo structure...")
+        with tempfile.TemporaryDirectory(
+            prefix="s2t_put_",
+            dir=str(repo_data_dir.parent),
+        ) as temp_dir:
+            staged_repo_data_dir = Path(temp_dir) / repo_data_dir.name
+            staged_repo_data_dir.mkdir(parents=True, exist_ok=True)
 
-        export_excel_to_repo(
-            excel_path=str(input_excel),
-            output_dir=str(repo_data_dir),
-        )
+            export_excel_to_repo(
+                excel_path=str(input_excel),
+                output_dir=str(staged_repo_data_dir),
+                logger=command.logger,
+            )
+
+            if command.logger:
+                command.logger("Replacing repo data directory with staged export...")
+
+            preserved_names = {".git"} if repo_data_dir == repo_dir else set()
+            replace_directory_contents(
+                path=repo_data_dir,
+                replacement_dir=staged_repo_data_dir,
+                preserved_names=preserved_names,
+            )
 
         version_rel_path = version_path.relative_to(repo_dir)
 
