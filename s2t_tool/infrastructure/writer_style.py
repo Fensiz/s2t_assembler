@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from openpyxl import Workbook
+from openpyxl.cell.rich_text import CellRichText
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import column_index_from_string, get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
@@ -112,7 +113,8 @@ def apply_base_style(sheet: Worksheet, cfg: dict[str, Any]) -> None:
 
     for row in sheet.iter_rows():
         for cell in row:
-            cell.font = Font(name=font_name, size=font_size)
+            if not isinstance(cell.value, CellRichText):
+                cell.font = Font(name=font_name, size=font_size)
             cell.alignment = Alignment(wrap_text=wrap_text, vertical=vertical_alignment)
 
 
@@ -359,6 +361,8 @@ def append_csv_sheet(
     pre_transforms_sheet: str,
     joins_sheet: str,
     mappings_sheet: str,
+    diff_csv_path: Path | None = None,
+    maybe_build_rich_diff=None,
 ) -> None:
     if not csv_path.exists():
         if required:
@@ -367,9 +371,24 @@ def append_csv_sheet(
 
     sheet = create_sheet(wb, title)
     headers, rows = read_csv_rows(csv_path)
+    old_rows: list[list[str]] = []
+    if diff_csv_path is not None and diff_csv_path.exists():
+        _, old_rows = read_csv_rows(diff_csv_path)
+
     if headers:
         sheet.append([repo_header_to_excel(h) for h in headers])
-    for row in rows:
-        sheet.append(row)
+
+    for row_idx, row in enumerate(rows):
+        output_row: list[Any] = []
+        old_row = old_rows[row_idx] if row_idx < len(old_rows) else []
+
+        for col_idx, value in enumerate(row):
+            old_value = old_row[col_idx] if col_idx < len(old_row) else ""
+            if maybe_build_rich_diff is not None and diff_csv_path is not None:
+                output_row.append(maybe_build_rich_diff(True, old_value, value))
+            else:
+                output_row.append(value)
+
+        sheet.append(output_row)
 
     finalize_sheet_style(sheet, config, title, pre_transforms_sheet, joins_sheet, mappings_sheet)

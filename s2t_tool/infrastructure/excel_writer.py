@@ -7,7 +7,6 @@ from typing import Any
 from openpyxl import Workbook
 from openpyxl.cell.rich_text import CellRichText, TextBlock
 from openpyxl.cell.text import InlineFont
-from openpyxl.styles import Font
 from openpyxl.worksheet.worksheet import Worksheet
 
 from s2t_tool.domain.schema import DEFAULT_SCHEMA, S2TSchema
@@ -56,9 +55,8 @@ ST_DECODER_SHEET = SCHEMA.st_decoder_sheet
 ST_FILTER_SHEET = SCHEMA.st_filter_sheet
 METADATA_SHEET = SCHEMA.metadata_sheet
 
-BLACK_FONT = InlineFont(color="000000")
-GREEN_FONT = InlineFont(color="008000")
-RED_FONT = InlineFont(color="FF0000", strike=True)
+RED_FONT = InlineFont(color="00FF0000", strike=True)
+GREEN_FONT = InlineFont(color="00008000")
 
 
 # ============================================================
@@ -136,33 +134,75 @@ def mapping_row_key(load_code: str, table_name: str, attribute_code: str) -> tup
     )
 
 
-def build_change_history_sheet(wb: Workbook, repo_dir: Path, config: dict[str, Any]) -> None:
+def build_change_history_sheet(
+    wb: Workbook,
+    repo_dir: Path,
+    config: dict[str, Any],
+    diff_repo_dir: str | None = None,
+) -> None:
     path = repo_dir / CHANGE_HISTORY_JSON
     entries = read_json_file(path, default=[])
+    diff_enabled = diff_repo_dir is not None
+    old_entries: list[dict[str, Any]] = []
+    if diff_enabled:
+        old_entries = read_json_file(Path(diff_repo_dir) / CHANGE_HISTORY_JSON, default=[]) or []
     sheet = create_sheet(wb, CHANGE_HISTORY_SHEET)
 
     sheet.append(["Author", "Date", "Version", "Description", "Jira ticket"])
 
-    for entry in entries:
+    for row_idx, entry in enumerate(entries):
+        old_entry = old_entries[row_idx] if row_idx < len(old_entries) else {}
         sheet.append(
             [
-                entry.get("author"),
-                entry.get("date"),
-                entry.get("version"),
-                entry.get("description"),
-                entry.get("jira_ticket"),
+                maybe_build_rich_diff(diff_enabled, old_entry.get("author"), entry.get("author")),
+                maybe_build_rich_diff(diff_enabled, old_entry.get("date"), entry.get("date")),
+                maybe_build_rich_diff(diff_enabled, old_entry.get("version"), entry.get("version")),
+                maybe_build_rich_diff(diff_enabled, old_entry.get("description"), entry.get("description")),
+                maybe_build_rich_diff(diff_enabled, old_entry.get("jira_ticket"), entry.get("jira_ticket")),
             ]
         )
 
     finalize_sheet_style(sheet, config, CHANGE_HISTORY_SHEET, PRE_TRANSFORMS_SHEET, JOINS_SHEET, MAPPINGS_SHEET)
 
 
-def build_source_lg_sheet(wb: Workbook, repo_dir: Path, config: dict[str, Any]) -> None:
-    append_csv_sheet(wb, SOURCE_LG_SHEET, repo_dir / SOURCE_LG_CSV, config, True, PRE_TRANSFORMS_SHEET, JOINS_SHEET, MAPPINGS_SHEET)
+def build_source_lg_sheet(
+    wb: Workbook,
+    repo_dir: Path,
+    config: dict[str, Any],
+    diff_repo_dir: str | None = None,
+) -> None:
+    append_csv_sheet(
+        wb,
+        SOURCE_LG_SHEET,
+        repo_dir / SOURCE_LG_CSV,
+        config,
+        True,
+        PRE_TRANSFORMS_SHEET,
+        JOINS_SHEET,
+        MAPPINGS_SHEET,
+        diff_csv_path=(Path(diff_repo_dir) / SOURCE_LG_CSV) if diff_repo_dir else None,
+        maybe_build_rich_diff=maybe_build_rich_diff,
+    )
 
 
-def build_targets_sheet(wb: Workbook, repo_dir: Path, config: dict[str, Any]) -> None:
-    append_csv_sheet(wb, TARGETS_SHEET, repo_dir / TARGETS_CSV, config, True, PRE_TRANSFORMS_SHEET, JOINS_SHEET, MAPPINGS_SHEET)
+def build_targets_sheet(
+    wb: Workbook,
+    repo_dir: Path,
+    config: dict[str, Any],
+    diff_repo_dir: str | None = None,
+) -> None:
+    append_csv_sheet(
+        wb,
+        TARGETS_SHEET,
+        repo_dir / TARGETS_CSV,
+        config,
+        True,
+        PRE_TRANSFORMS_SHEET,
+        JOINS_SHEET,
+        MAPPINGS_SHEET,
+        diff_csv_path=(Path(diff_repo_dir) / TARGETS_CSV) if diff_repo_dir else None,
+        maybe_build_rich_diff=maybe_build_rich_diff,
+    )
 
 
 # ============================================================
@@ -330,13 +370,13 @@ class RepoExcelWriter:
             self.logger(f"Created: {self.output_excel_path}")
 
     def build_change_history_sheet(self, wb: Workbook) -> None:
-        build_change_history_sheet(wb, self.repo_dir, self.config)
+        build_change_history_sheet(wb, self.repo_dir, self.config, self.diff_repo_dir)
 
     def build_source_lg_sheet(self, wb: Workbook) -> None:
-        build_source_lg_sheet(wb, self.repo_dir, self.config)
+        build_source_lg_sheet(wb, self.repo_dir, self.config, self.diff_repo_dir)
 
     def build_targets_sheet(self, wb: Workbook) -> None:
-        build_targets_sheet(wb, self.repo_dir, self.config)
+        build_targets_sheet(wb, self.repo_dir, self.config, self.diff_repo_dir)
 
     def build_pre_transforms_sheet(self, wb: Workbook) -> None:
         build_pre_transforms_sheet(wb, self.repo_dir, self.config, self.diff_repo_dir)
@@ -348,10 +388,30 @@ class RepoExcelWriter:
         build_mappings_sheet(wb, self.repo_dir, self.config, self.diff_repo_dir)
 
     def append_optional_csv_sheets(self, wb: Workbook) -> None:
-        append_csv_sheet(wb, self.schema.settings_sheet, self.repo_dir / self.schema.settings_csv, self.config, False, PRE_TRANSFORMS_SHEET, JOINS_SHEET, MAPPINGS_SHEET)
-        append_csv_sheet(wb, self.schema.parameters_sheet, self.repo_dir / self.schema.parameters_csv, self.config, False, PRE_TRANSFORMS_SHEET, JOINS_SHEET, MAPPINGS_SHEET)
-        append_csv_sheet(wb, self.schema.st_decoder_sheet, self.repo_dir / self.schema.st_decoder_csv, self.config, False, PRE_TRANSFORMS_SHEET, JOINS_SHEET, MAPPINGS_SHEET)
-        append_csv_sheet(wb, self.schema.st_filter_sheet, self.repo_dir / self.schema.st_filter_csv, self.config, False, PRE_TRANSFORMS_SHEET, JOINS_SHEET, MAPPINGS_SHEET)
+        append_csv_sheet(
+            wb, self.schema.settings_sheet, self.repo_dir / self.schema.settings_csv, self.config, False,
+            PRE_TRANSFORMS_SHEET, JOINS_SHEET, MAPPINGS_SHEET,
+            diff_csv_path=(Path(self.diff_repo_dir) / self.schema.settings_csv) if self.diff_repo_dir else None,
+            maybe_build_rich_diff=maybe_build_rich_diff,
+        )
+        append_csv_sheet(
+            wb, self.schema.parameters_sheet, self.repo_dir / self.schema.parameters_csv, self.config, False,
+            PRE_TRANSFORMS_SHEET, JOINS_SHEET, MAPPINGS_SHEET,
+            diff_csv_path=(Path(self.diff_repo_dir) / self.schema.parameters_csv) if self.diff_repo_dir else None,
+            maybe_build_rich_diff=maybe_build_rich_diff,
+        )
+        append_csv_sheet(
+            wb, self.schema.st_decoder_sheet, self.repo_dir / self.schema.st_decoder_csv, self.config, False,
+            PRE_TRANSFORMS_SHEET, JOINS_SHEET, MAPPINGS_SHEET,
+            diff_csv_path=(Path(self.diff_repo_dir) / self.schema.st_decoder_csv) if self.diff_repo_dir else None,
+            maybe_build_rich_diff=maybe_build_rich_diff,
+        )
+        append_csv_sheet(
+            wb, self.schema.st_filter_sheet, self.repo_dir / self.schema.st_filter_csv, self.config, False,
+            PRE_TRANSFORMS_SHEET, JOINS_SHEET, MAPPINGS_SHEET,
+            diff_csv_path=(Path(self.diff_repo_dir) / self.schema.st_filter_csv) if self.diff_repo_dir else None,
+            maybe_build_rich_diff=maybe_build_rich_diff,
+        )
 
     def build_metadata_sheet(self, wb: Workbook) -> None:
         build_metadata_sheet(wb, self.config, self.diff_commit)
