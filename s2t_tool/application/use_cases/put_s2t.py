@@ -6,7 +6,7 @@ from pathlib import Path
 from s2t_tool.application.commands import PutCommand
 from s2t_tool.domain.branching import is_commit_ref, resolve_branch
 from s2t_tool.domain.file_naming import ensure_put_compatible_excel, rename_excel_after_put, resolve_input_excel_path
-from s2t_tool.domain.versioning import VERSION_JSON, resolve_put_version, write_repo_version
+from s2t_tool.domain.versioning import VERSION_JSON, read_repo_version, resolve_put_version, write_repo_version
 from s2t_tool.infrastructure.config import resolve_repo_data_dir, resolve_repo_dir, resolve_repo_url
 from s2t_tool.infrastructure.excel_reader import export_excel_to_repo
 from s2t_tool.infrastructure.git_repo import (
@@ -35,6 +35,7 @@ class PutS2TUseCase:
 
         repo_data_dir = resolve_repo_data_dir(command.config, repo_dir)
         version_path = repo_data_dir / VERSION_JSON
+        original_version = read_repo_version(version_path)
         input_excel = resolve_input_excel_path(
             config=command.config,
             product_name=command.product_name,
@@ -74,6 +75,9 @@ class PutS2TUseCase:
                 preserved_names=preserved_names,
             )
 
+        if command.keep_version:
+            write_repo_version(version_path, original_version)
+
         version_rel_path = version_path.relative_to(repo_dir)
         if not has_changes_excluding(repo_dir, excluded_paths=[version_rel_path]):
             if command.logger:
@@ -82,13 +86,18 @@ class PutS2TUseCase:
             print("No content changes detected. Nothing to commit.")
             return
 
-        new_version = resolve_put_version(
-            version_arg=command.version_arg,
-            input_excel=input_excel,
-            product_name=command.product_name,
-            version_path=version_path,
-        )
-        write_repo_version(version_path, new_version)
+        if command.keep_version:
+            new_version = original_version
+            if command.logger:
+                command.logger(f"Keeping version unchanged: {new_version}")
+        else:
+            new_version = resolve_put_version(
+                version_arg=command.version_arg,
+                input_excel=input_excel,
+                product_name=command.product_name,
+                version_path=version_path,
+            )
+            write_repo_version(version_path, new_version)
 
         commit_message = (
             command.commit_message_arg.strip()
@@ -116,4 +125,3 @@ class PutS2TUseCase:
 
         print(f"Repo updated: {repo_dir}")
         print(f"New version: {new_version}")
-

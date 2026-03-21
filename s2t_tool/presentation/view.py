@@ -31,6 +31,7 @@ class S2TView:
         self.root.configure(bg=self.BG)
 
         self.open_after_get_var = tk.BooleanVar(value=False)
+        self.keep_version_var = tk.BooleanVar(value=False)
 
         self.product_entry: tk.Entry | None = None
         self.branch_entry: tk.Entry | None = None
@@ -228,8 +229,21 @@ class S2TView:
             highlightthickness=0,
         ).grid(row=1, column=0, sticky="n", pady=(8, 0))
 
+        tk.Checkbutton(
+            body,
+            text=tr("keep_version", self.language),
+            variable=self.keep_version_var,
+            bg=self.PANEL_BG,
+            fg=self.TEXT,
+            activebackground=self.PANEL_BG,
+            activeforeground=self.TEXT,
+            selectcolor=self.PANEL_BG,
+            font=self.body_font,
+            highlightthickness=0,
+        ).grid(row=2, column=0, sticky="n", pady=(6, 0))
+
         self.version_container = tk.Frame(body, bg=self.PANEL_BG, highlightthickness=0, bd=0)
-        self.version_container.grid(row=2, column=0, sticky="ew", pady=(12, 0))
+        self.version_container.grid(row=3, column=0, sticky="ew", pady=(12, 0))
 
         self.version_label = tk.Label(
             self.version_container,
@@ -412,6 +426,7 @@ class S2TView:
         return GetRequest(
             product_name=self.product_entry.get().strip(),
             branch=self._resolve_branch_value(self.branch_entry.get()),
+            version=self.version_entry.get().strip() or None,
             diff_commit=self.diff_commit_entry.get().strip() or None,
         )
 
@@ -425,6 +440,7 @@ class S2TView:
             branch=self._resolve_branch_value(self.branch_entry.get()),
             commit_message=self.commit_message_entry.get().strip() or None,
             version=self.version_entry.get().strip() or None,
+            keep_version=self.keep_version_var.get(),
         )
 
     def fill_form_from_recent_item(self, item: dict[str, str]) -> None:
@@ -441,6 +457,7 @@ class S2TView:
 
         self.commit_message_entry.delete(0, tk.END)
         self.version_entry.delete(0, tk.END)
+        self.keep_version_var.set(False)
 
     def show_error(self, title: str, message: str) -> None:
         messagebox.showerror(title, message)

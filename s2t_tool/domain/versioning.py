@@ -9,6 +9,25 @@ from s2t_tool.shared.files import read_json_file, write_json_file
 VERSION_JSON = "version.json"
 
 
+def build_version_tag(version: str) -> str:
+    normalized = str(version).strip()
+    if not normalized:
+        raise ValueError("Version must not be empty")
+    return normalized if normalized.startswith("s2t.") else f"s2t.{normalized}"
+
+
+def looks_like_version(value: str | None) -> bool:
+    if value is None:
+        return False
+    normalized = value.strip()
+    if not normalized:
+        return False
+    if normalized.startswith("s2t."):
+        normalized = normalized[4:]
+    parts = normalized.split(".")
+    return all(part.isdigit() for part in parts if part)
+
+
 def read_repo_version(version_path: Path) -> str:
     """
     Read version from repo version.json.

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 class GetRequest:
     product_name: str
     branch: str | None
+    version: str | None
     diff_commit: str | None
 
 
@@ -16,3 +17,4 @@ class PutRequest:
     branch: str | None
     commit_message: str | None
     version: str | None
+    keep_version: bool

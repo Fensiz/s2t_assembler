@@ -16,6 +16,7 @@ class ServiceCommitRefTests(unittest.TestCase):
             product_name="s2t_test",
             branch_arg="c220991",
             version_arg=None,
+            keep_version=False,
             excel_arg=None,
             commit_message_arg=None,
             config={"default_branch": "s2t/master"},
@@ -45,6 +46,7 @@ class ServiceCommitRefTests(unittest.TestCase):
             command = GetCommand(
                 product_name="s2t_test",
                 branch_arg="c220991",
+                version_arg=None,
                 diff_commit_arg=None,
                 config=config,
                 logger=None,

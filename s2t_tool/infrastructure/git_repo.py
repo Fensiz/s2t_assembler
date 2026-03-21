@@ -308,7 +308,7 @@ def hard_reset_to_remote(repo_dir: Path, branch: str, base_branch: str, logger=N
         - if target branch == base_branch -> create orphan branch
         - otherwise create branch from base_branch
     """
-    run_git(["fetch", "origin"], cwd=repo_dir, log=logger)
+    run_git(["fetch", "origin", "--tags"], cwd=repo_dir, log=logger)
 
     # Branch exists in remote -> sync local branch to remote state.
     if local_remote_branch_exists(repo_dir, branch):

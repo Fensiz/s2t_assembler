@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import shutil
+import subprocess
+import sys
 import tkinter as tk
 from pathlib import Path
 
@@ -17,11 +20,13 @@ from s2t_tool.infrastructure.os_runtime import (
 from s2t_tool.infrastructure.recent_store import RecentItemsStore
 from s2t_tool.infrastructure.update_service import UpdateService
 from s2t_tool.presentation.form_models import GetRequest, PutRequest
+from s2t_tool.presentation.i18n import detect_language, tr
 from s2t_tool.presentation.view import S2TView
 
 
 class S2TApp:
     def __init__(self) -> None:
+        self.language = detect_language()
         self.config = load_app_config()
         self.recent_store = RecentItemsStore()
         self.service = S2TService()
@@ -50,7 +55,7 @@ class S2TApp:
                 logger=lambda message: self.view.append_status(message),
             ).ensure_initial_setup()
         except Exception as exc:
-            self.view.append_status(f"Initial setup skipped: {exc}")
+            self.view.append_status(self._t("initial_setup_skipped", error=exc))
 
         self.root.after(1000, self._check_updates_on_start)
 
@@ -60,6 +65,9 @@ class S2TApp:
 
     def _call_in_ui(self, fn) -> None:
         self.root.after(0, fn)
+
+    def _t(self, key: str, **kwargs: object) -> str:
+        return tr(key, self.language, **kwargs)
 
     def _set_status_ui(self, message: str) -> None:
         self.root.after(0, lambda msg=message: self.view.set_status(msg))
@@ -85,9 +93,12 @@ class S2TApp:
                 worker()
             except Exception as exc:
                 error_text = str(exc)
-                self._set_status_ui(f"{error_title} failed:\n{error_text}")
+                self._set_status_ui(self._t("action_failed_status", action=error_title, error=error_text))
                 self._call_in_ui(
-                    lambda msg=error_text: self.view.show_error(f"{error_title} failed", msg)
+                    lambda msg=error_text: self.view.show_error(
+                        self._t("action_failed_title", action=error_title),
+                        msg,
+                    )
                 )
             finally:
                 self._call_in_ui(lambda: self.view.set_action_buttons_enabled(True))
@@ -151,19 +162,16 @@ class S2TApp:
 
     def _validate_get_request(self, request: GetRequest) -> bool:
         if not request.product_name:
-            self.view.show_error("Error", "Product name is required")
+            self.view.show_error(self._t("error_title"), self._t("product_name_required"))
             return False
         return True
 
     def _validate_put_request(self, request: PutRequest) -> bool:
         if not request.product_name:
-            self.view.show_error("Error", "Product name is required")
+            self.view.show_error(self._t("error_title"), self._t("product_name_required"))
             return False
         if is_commit_ref(request.branch):
-            self.view.show_error(
-                "Error",
-                "PUT requires a branch name. Commit hash can be used only for GET.",
-            )
+            self.view.show_error(self._t("error_title"), self._t("put_requires_branch"))
             return False
         return True
 
@@ -178,11 +186,11 @@ class S2TApp:
         try:
             folder = resolve_excel_output_dir(self.config)
             open_directory_in_os(folder)
-            self.view.append_status(f"Opened folder: {folder}")
+            self.view.append_status(self._t("opened_folder", path=folder))
         except Exception as exc:
             error_text = str(exc)
-            self.view.set_status(f"Open folder failed:\n{error_text}")
-            self.view.show_error("Open folder failed", error_text)
+            self.view.set_status(self._t("open_folder_failed", error=error_text))
+            self.view.show_error(self._t("open_folder_failed_title"), error_text)
 
     def run_get(self) -> None:
         """
@@ -193,15 +201,15 @@ class S2TApp:
             return
 
         start_message = (
-            f"Running GET for '{request.product_name}' with diff against '{request.diff_commit}'..."
+            self._t("running_get_diff", product=request.product_name, commit=request.diff_commit)
             if request.diff_commit
-            else f"Running GET for '{request.product_name}'..."
+            else self._t("running_get", product=request.product_name)
         )
 
         self._run_background_action(
             start_message=start_message,
             worker=lambda: self._worker_get(request),
-            error_title="GET",
+            error_title=tr("get_export", self.language),
         )
 
     def run_put(self) -> None:
@@ -213,9 +221,9 @@ class S2TApp:
             return
 
         self._run_background_action(
-            start_message=f"Running PUT for '{request.product_name}'...",
+            start_message=self._t("running_put", product=request.product_name),
             worker=lambda: self._worker_put(request),
-            error_title="PUT",
+            error_title=tr("put_publish", self.language),
         )
 
     # --------------------------------------------------------
@@ -226,31 +234,32 @@ class S2TApp:
         self._update_recent_items(request.product_name, request.branch or "")
 
         if request.diff_commit:
-            message = f"GET completed for '{request.product_name}' with diff"
+            message = self._t("get_completed_diff", product=request.product_name)
         else:
-            message = f"GET completed for '{request.product_name}'"
+            message = self._t("get_completed", product=request.product_name)
 
         if downloaded_file:
-            message += f"\nCreated: {downloaded_file}"
+            message += f"\n{self._t('created_file', path=downloaded_file)}"
 
         self.view.append_status(message)
 
         if self.view.open_after_get_var.get() and downloaded_file is not None:
             try:
                 open_file_in_os(downloaded_file)
-                self.view.append_status(f"Opened: {downloaded_file}")
+                self.view.append_status(self._t("opened_file", path=downloaded_file))
             except Exception as exc:
-                self.view.append_status(f"Open failed: {exc}")
+                self.view.append_status(self._t("open_failed", error=exc))
 
     def _after_put_success(self, request: PutRequest) -> None:
         self._update_recent_items(request.product_name, request.branch or "")
-        self.view.append_status(f"PUT completed for '{request.product_name}'")
+        self.view.append_status(self._t("put_completed", product=request.product_name))
 
     def _worker_get(self, request: GetRequest) -> None:
         self.service.handle_get(
             GetCommand(
                 product_name=request.product_name,
                 branch_arg=request.branch,
+                version_arg=request.version,
                 diff_commit_arg=request.diff_commit,
                 config=self.config,
                 logger=self._ui_logger,
@@ -272,6 +281,7 @@ class S2TApp:
                 product_name=request.product_name,
                 branch_arg=request.branch,
                 version_arg=request.version,
+                keep_version=request.keep_version,
                 excel_arg=None,
                 commit_message_arg=request.commit_message,
                 config=self.config,
@@ -297,9 +307,9 @@ class S2TApp:
                 )
 
                 if available and latest_version:
-                    self._append_status_ui(f"Доступно обновление: {latest_version}")
+                    self._append_status_ui(self._t("update_available_status", version=latest_version))
             except Exception as exc:
-                self._append_status_ui(f"Не удалось проверить обновления: {exc}")
+                self._append_status_ui(self._t("update_check_failed_status", error=exc))
 
         run_in_thread(worker)
 
@@ -320,23 +330,20 @@ class S2TApp:
                 if not available:
                     self._call_in_ui(
                         lambda: self.view.show_info(
-                            "Обновление",
-                            "У вас уже установлена последняя версия.",
+                            self._t("update_title"),
+                            self._t("already_latest_version"),
                         )
                     )
                     return
 
-                message = (
-                    f"Доступна новая версия: {latest_version}.\n\n"
-                    f"Установить обновление сейчас?"
-                )
+                message = self._t("new_version_available", version=latest_version)
 
                 def ask_and_update() -> None:
-                    confirmed = self.view.ask_yes_no("Обновление", message)
+                    confirmed = self.view.ask_yes_no(self._t("update_title"), message)
                     if not confirmed:
                         return
 
-                    self.view.append_status("Начинаю обновление...")
+                    self.view.append_status(self._t("starting_update"))
                     self.view.set_action_buttons_enabled(False)
                     run_in_thread(self._perform_update)
 
@@ -346,8 +353,8 @@ class S2TApp:
                 error_text = str(exc)
                 self._call_in_ui(
                     lambda msg=error_text: self.view.show_error(
-                        "Обновление",
-                        f"Не удалось проверить обновление:\n{msg}",
+                        self._t("update_title"),
+                        self._t("update_check_failed", error=msg),
                     )
                 )
 
@@ -368,7 +375,7 @@ class S2TApp:
                 )
 
             command = [python_executable, str(app_path)]
-            self.view.append_status(f"Запускаю новую версию: {' '.join(command)}")
+            self.view.append_status(self._t("starting_new_version", command=" ".join(command)))
 
             subprocess.Popen(
                 command,
@@ -376,15 +383,15 @@ class S2TApp:
                 close_fds=True,
             )
 
-            self.view.append_status("Новая версия запущена. Закрываю текущее окно...")
+            self.view.append_status(self._t("new_version_started"))
             self.root.after(200, self.root.destroy)
 
         except Exception as exc:
             self.view.show_error(
-                "Обновление",
-                f"Не удалось перезапустить приложение:\n{exc}",
+                self._t("update_title"),
+                self._t("restart_failed", error=exc),
             )
-            self.view.append_status(f"Ошибка перезапуска: {exc}")
+            self.view.append_status(self._t("restart_error_status", error=exc))
             self.view.set_action_buttons_enabled(True)
 
     def _perform_update(self) -> None:
@@ -394,7 +401,7 @@ class S2TApp:
         try:
             updated_app_path = self.update_service.perform_update()
 
-            self._append_status_ui("Обновление установлено. Перезапуск приложения...")
+            self._append_status_ui(self._t("update_installed_restart"))
 
             self._call_in_ui(
                 lambda path=updated_app_path: self._restart_with_updated_app(path)
@@ -404,11 +411,11 @@ class S2TApp:
             error_text = str(exc)
             self._call_in_ui(
                 lambda msg=error_text: self.view.show_error(
-                    "Обновление",
-                    f"Не удалось установить обновление:\n{msg}",
+                    self._t("update_title"),
+                    self._t("update_install_failed", error=msg),
                 )
             )
-            self._append_status_ui(f"Ошибка обновления: {error_text}")
+            self._append_status_ui(self._t("update_error_status", error=error_text))
             self._call_in_ui(lambda: self.view.set_action_buttons_enabled(True))
 
 

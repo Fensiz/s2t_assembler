@@ -8,6 +8,7 @@ from typing import Any
 class GetCommand:
     product_name: str
     branch_arg: str | None
+    version_arg: str | None
     diff_commit_arg: str | None
     config: dict[str, Any]
     logger: Any = None
@@ -18,6 +19,7 @@ class PutCommand:
     product_name: str
     branch_arg: str | None
     version_arg: str | None
+    keep_version: bool
     excel_arg: str | None
     commit_message_arg: str | None
     config: dict[str, Any]
