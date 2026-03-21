@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
 from openpyxl import Workbook
@@ -48,6 +49,20 @@ class ExcelDiffOutputTests(unittest.TestCase):
 
             sheet = wb["Settings"]
             self.assertIsInstance(sheet["A2"].value, CellRichText)
+
+    def test_saved_rich_text_uses_opaque_argb_colors(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output = Path(temp_dir) / "diff.xlsx"
+            wb = Workbook()
+            ws = wb.active
+            ws["A1"] = build_rich_diff("before", "after")
+            wb.save(output)
+
+            with zipfile.ZipFile(output) as archive:
+                xml = archive.read("xl/worksheets/sheet1.xml").decode("utf-8")
+
+            self.assertIn('rgb="FFFF0000"', xml)
+            self.assertIn('rgb="FF008000"', xml)
 
 
 if __name__ == "__main__":

@@ -55,8 +55,8 @@ ST_DECODER_SHEET = SCHEMA.st_decoder_sheet
 ST_FILTER_SHEET = SCHEMA.st_filter_sheet
 METADATA_SHEET = SCHEMA.metadata_sheet
 
-RED_FONT = InlineFont(color="00FF0000", strike=True)
-GREEN_FONT = InlineFont(color="00008000")
+RED_FONT = InlineFont(color="FFFF0000", strike=True)
+GREEN_FONT = InlineFont(color="FF008000")
 
 
 # ============================================================
