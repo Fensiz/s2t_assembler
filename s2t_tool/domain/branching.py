@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import re
 from typing import Any
+
+
+COMMIT_REF_RE = re.compile(r"^[0-9a-fA-F]{7,40}$")
 
 
 def branch_prefix_from_default(default_branch: str) -> str:
@@ -74,6 +78,12 @@ def is_debug_branch(branch: str, default_branch: str) -> bool:
     """
     tail = branch_tail(branch, default_branch).strip().lower()
     return tail.startswith("debug/")
+
+
+def is_commit_ref(value: str | None) -> bool:
+    if value is None:
+        return False
+    return bool(COMMIT_REF_RE.fullmatch(str(value).strip()))
 
 
 def resolve_branch(config: dict[str, Any], branch_arg: str | None) -> str:

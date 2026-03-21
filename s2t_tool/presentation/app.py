@@ -5,6 +5,7 @@ from pathlib import Path
 
 from s2t_tool.application.commands import GetCommand, PutCommand
 from s2t_tool.application.service import S2TService
+from s2t_tool.domain.branching import is_commit_ref
 from s2t_tool.infrastructure.config import load_app_config, resolve_excel_output_dir
 from s2t_tool.infrastructure.initial_setup import InitialSetupService
 from s2t_tool.infrastructure.update_service import UpdateService
@@ -157,6 +158,12 @@ class S2TApp:
     def _validate_put_request(self, request: PutRequest) -> bool:
         if not request.product_name:
             self.view.show_error("Error", "Product name is required")
+            return False
+        if is_commit_ref(request.branch):
+            self.view.show_error(
+                "Error",
+                "PUT requires a branch name. Commit hash can be used only for GET.",
+            )
             return False
         return True
 

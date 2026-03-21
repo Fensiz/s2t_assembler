@@ -4,11 +4,12 @@ import tempfile
 from pathlib import Path
 
 from s2t_tool.application.commands import GetCommand, PutCommand
-from s2t_tool.domain.branching import is_debug_branch, resolve_branch
+from s2t_tool.domain.branching import is_commit_ref, is_debug_branch, resolve_branch
 from s2t_tool.domain.file_naming import (
     build_branch_diff_excel_filename,
     build_branch_excel_filename,
-    ensure_not_diff_excel,
+    build_commit_excel_filename,
+    ensure_put_compatible_excel,
     rename_excel_after_put,
     resolve_input_excel_path,
 )
@@ -42,21 +43,63 @@ class S2TService:
         """
         Download/refresh repo, build Excel and save it locally.
         """
-        branch = resolve_branch(command.config, command.branch_arg)
         base_branch = str(command.config.get("default_branch", "master")).strip()
-        debug_mode = is_debug_branch(branch, base_branch)
+        commit_ref = command.branch_arg.strip() if is_commit_ref(command.branch_arg) else None
+        branch = base_branch if commit_ref else resolve_branch(command.config, command.branch_arg)
+        debug_mode = False if commit_ref else is_debug_branch(branch, base_branch)
         repo_url = resolve_repo_url(command.config, command.product_name)
         repo_dir = resolve_repo_dir(command.config, command.product_name)
 
         if command.logger:
             command.logger(f"Preparing repository: {repo_url}")
-            command.logger(f"Branch: {branch}")
+            if commit_ref:
+                command.logger(f"Commit: {commit_ref}")
+                command.logger(f"Base branch for fetch: {branch}")
+            else:
+                command.logger(f"Branch: {branch}")
 
         ensure_repo(repo_url, repo_dir, branch, base_branch, logger=command.logger)
 
         repo_data_dir = resolve_repo_data_dir(command.config, repo_dir)
+
+        if commit_ref:
+            with tempfile.TemporaryDirectory(prefix="s2t_commit_") as temp_dir:
+                export_commit_tree(
+                    repo_dir=repo_dir,
+                    commit_ref=commit_ref,
+                    target_dir=Path(temp_dir),
+                )
+                source_repo_data_dir = resolve_repo_data_dir(command.config, Path(temp_dir))
+                version_path = source_repo_data_dir / VERSION_JSON
+                version = read_repo_version(version_path)
+                self._build_get_excel(
+                    command=command,
+                    repo_data_dir=source_repo_data_dir,
+                    excel_version=version,
+                    debug_mode=debug_mode,
+                    commit_ref=commit_ref,
+                )
+            return
+
         version_path = repo_data_dir / VERSION_JSON
         version = read_repo_version(version_path)
+        self._build_get_excel(
+            command=command,
+            repo_data_dir=repo_data_dir,
+            excel_version=version,
+            debug_mode=debug_mode,
+            commit_ref=None,
+        )
+
+    def _build_get_excel(
+        self,
+        command: GetCommand,
+        repo_data_dir: Path,
+        excel_version: str,
+        debug_mode: bool,
+        commit_ref: str | None,
+    ) -> None:
+        base_branch = str(command.config.get("default_branch", "master")).strip()
 
         excel_output_dir = resolve_excel_output_dir(command.config)
         ensure_excel_output_dir(excel_output_dir)
@@ -64,13 +107,19 @@ class S2TService:
         if command.diff_commit_arg:
             output_excel = excel_output_dir / build_branch_diff_excel_filename(
                 command.product_name,
-                version,
+                excel_version,
                 debug_mode,
+            )
+        elif commit_ref:
+            output_excel = excel_output_dir / build_commit_excel_filename(
+                command.product_name,
+                excel_version,
+                commit_ref,
             )
         else:
             output_excel = excel_output_dir / build_branch_excel_filename(
                 command.product_name,
-                version,
+                excel_version,
                 debug_mode,
             )
 
@@ -109,7 +158,7 @@ class S2TService:
                 output_excel_path=str(output_excel),
                 config_path=writer_config,
                 diff_repo_dir=None,
-                diff_commit=None,
+                diff_commit=commit_ref,
                 logger=command.logger,
             )
 
@@ -122,6 +171,9 @@ class S2TService:
         """
         Parse Excel into repo structure, update version, commit and push.
         """
+        if is_commit_ref(command.branch_arg):
+            raise ValueError("PUT requires a branch name. Commit hash can be used only for GET.")
+
         branch = resolve_branch(command.config, command.branch_arg)
         base_branch = str(command.config.get("default_branch", "master")).strip()
         repo_url = resolve_repo_url(command.config, command.product_name)
@@ -147,7 +199,7 @@ class S2TService:
         if not input_excel.exists():
             raise ValueError(f"Excel file not found: {input_excel}")
 
-        ensure_not_diff_excel(input_excel)
+        ensure_put_compatible_excel(input_excel)
 
         if command.logger:
             command.logger(f"Reading Excel: {input_excel}")

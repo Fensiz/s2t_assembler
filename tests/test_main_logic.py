@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import unittest
 
-from s2t_tool.domain.branching import normalize_branch_name, resolve_branch
-from s2t_tool.domain.file_naming import parse_version_from_excel_filename
+from s2t_tool.domain.branching import is_commit_ref, normalize_branch_name, resolve_branch
+from s2t_tool.domain.file_naming import build_commit_excel_filename, parse_version_from_excel_filename
 from s2t_tool.domain.versioning import bump_version, resolve_put_version
 
 
@@ -29,6 +29,18 @@ class MainLogicTests(unittest.TestCase):
 
     def test_bump_version_increments_last_component(self) -> None:
         self.assertEqual(bump_version("1.2.3.4"), "1.2.3.5")
+
+    def test_detect_commit_hash(self) -> None:
+        self.assertTrue(is_commit_ref("abcdef1"))
+        self.assertTrue(is_commit_ref("c220991"))
+        self.assertFalse(is_commit_ref("s2t/master"))
+        self.assertFalse(is_commit_ref("debug/test"))
+
+    def test_commit_excel_filename_is_distinct(self) -> None:
+        self.assertEqual(
+            build_commit_excel_filename("test", "1.2.3", "c220991abc"),
+            "S2T_USL_TEST_v1.2.3_commit_c220991a.xlsx",
+        )
 
     def test_resolve_put_version_prefers_filename_then_bumps(self) -> None:
         from pathlib import Path

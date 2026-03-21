@@ -22,6 +22,11 @@ def build_branch_diff_excel_filename(product_name: str, version: str, debug_mode
     return f"S2T_USL_{product_name.upper()}_v{version}{suffix}_diff.xlsx"
 
 
+def build_commit_excel_filename(product_name: str, version: str, commit_ref: str) -> str:
+    short_commit = commit_ref[:8]
+    return f"S2T_USL_{product_name.upper()}_v{version}_commit_{short_commit}.xlsx"
+
+
 def parse_version_from_excel_filename(excel_path: Path, product_name: str) -> str | None:
     """
     Extract version from file name.
@@ -31,6 +36,7 @@ def parse_version_from_excel_filename(excel_path: Path, product_name: str) -> st
         S2T_USL_TEST_v1.2.3_debug.xlsx
         S2T_USL_TEST_v1.2.3_diff.xlsx
         S2T_USL_TEST_v1.2.3_debug_diff.xlsx
+        S2T_USL_TEST_v1.2.3_commit_c220991.xlsx
     """
     filename = excel_path.name
 
@@ -38,6 +44,7 @@ def parse_version_from_excel_filename(excel_path: Path, product_name: str) -> st
         rf"^S2T_USL_{re.escape(product_name.upper())}_v"
         rf"(?P<version>.+?)"
         rf"(?:_debug)?"
+        rf"(?:_commit_[0-9a-fA-F]{{7,8}})?"
         rf"(?:_diff)?"
         rf"\.xlsx$"
     )
@@ -50,14 +57,20 @@ def parse_version_from_excel_filename(excel_path: Path, product_name: str) -> st
     return version or None
 
 
-def ensure_not_diff_excel(input_excel: Path) -> None:
+def ensure_put_compatible_excel(input_excel: Path) -> None:
     """
-    Prevent PUT from using diff Excel files.
+    Prevent PUT from using unsupported generated Excel files.
     """
-    if input_excel.name.lower().endswith("_diff.xlsx"):
+    lower_name = input_excel.name.lower()
+    if lower_name.endswith("_diff.xlsx"):
         raise ValueError(
             "Diff Excel cannot be used for PUT. "
             "Use the normal generated Excel file instead."
+        )
+    if "_commit_" in lower_name:
+        raise ValueError(
+            "Excel generated from a commit hash cannot be used for PUT. "
+            "Run GET for a branch and use that Excel file instead."
         )
 
 
@@ -92,7 +105,7 @@ def resolve_input_excel_path(
     candidates = sorted(
         [
             p for p in excel_dir.glob(pattern)
-            if not p.name.lower().endswith("_diff.xlsx")
+            if not p.name.lower().endswith("_diff.xlsx") and "_commit_" not in p.name.lower()
         ],
         key=lambda p: p.stat().st_mtime,
         reverse=True,

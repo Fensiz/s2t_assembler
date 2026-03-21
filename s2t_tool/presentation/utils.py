@@ -69,6 +69,7 @@ def find_latest_excel_file(
         ]
     else:
         patterns = [
+            f"S2T_USL_{product_upper}_v*_commit_*.xlsx",
             f"S2T_USL_{product_upper}_v*_debug.xlsx",
             f"S2T_USL_{product_upper}_v*.xlsx",
         ]
