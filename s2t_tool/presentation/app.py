@@ -20,7 +20,7 @@ from s2t_tool.infrastructure.os_runtime import (
 from s2t_tool.infrastructure.recent_store import RecentItemsStore
 from s2t_tool.infrastructure.update_service import UpdateService
 from s2t_tool.presentation.form_models import GetRequest, PutRequest
-from s2t_tool.presentation.i18n import detect_language, tr
+from s2t_tool.presentation.i18n import detect_language, localize_runtime_message, tr
 from s2t_tool.presentation.view import S2TView
 
 
@@ -36,7 +36,7 @@ class S2TApp:
 
         self.update_service = UpdateService(
             self.config,
-            logger=lambda message: self.view.append_status(message),
+            logger=self._ui_logger,
         )
 
         self.view.bind_actions(
@@ -52,7 +52,7 @@ class S2TApp:
         try:
             InitialSetupService(
                 self.config,
-                logger=lambda message: self.view.append_status(message),
+                logger=self._ui_logger,
             ).ensure_initial_setup()
         except Exception as exc:
             self.view.append_status(self._t("initial_setup_skipped", error=exc))
@@ -69,6 +69,9 @@ class S2TApp:
     def _t(self, key: str, **kwargs: object) -> str:
         return tr(key, self.language, **kwargs)
 
+    def _localize_runtime_message(self, message: object) -> str:
+        return localize_runtime_message(str(message), self.language)
+
     def _set_status_ui(self, message: str) -> None:
         self.root.after(0, lambda msg=message: self.view.set_status(msg))
 
@@ -79,7 +82,7 @@ class S2TApp:
         """
         Thread-safe logger for git/main progress messages.
         """
-        self._append_status_ui(line)
+        self._append_status_ui(self._localize_runtime_message(line))
 
     def _run_background_action(self, start_message: str, worker, error_title: str) -> None:
         """
@@ -92,7 +95,7 @@ class S2TApp:
             try:
                 worker()
             except Exception as exc:
-                error_text = str(exc)
+                error_text = self._localize_runtime_message(exc)
                 self._set_status_ui(self._t("action_failed_status", action=error_title, error=error_text))
                 self._call_in_ui(
                     lambda msg=error_text: self.view.show_error(
@@ -188,7 +191,7 @@ class S2TApp:
             open_directory_in_os(folder)
             self.view.append_status(self._t("opened_folder", path=folder))
         except Exception as exc:
-            error_text = str(exc)
+            error_text = self._localize_runtime_message(exc)
             self.view.set_status(self._t("open_folder_failed", error=error_text))
             self.view.show_error(self._t("open_folder_failed_title"), error_text)
 
@@ -248,7 +251,7 @@ class S2TApp:
                 open_file_in_os(downloaded_file)
                 self.view.append_status(self._t("opened_file", path=downloaded_file))
             except Exception as exc:
-                self.view.append_status(self._t("open_failed", error=exc))
+                self.view.append_status(self._t("open_failed", error=self._localize_runtime_message(exc)))
 
     def _after_put_success(self, request: PutRequest) -> None:
         self._update_recent_items(request.product_name, request.branch or "")
@@ -309,7 +312,7 @@ class S2TApp:
                 if available and latest_version:
                     self._append_status_ui(self._t("update_available_status", version=latest_version))
             except Exception as exc:
-                self._append_status_ui(self._t("update_check_failed_status", error=exc))
+                self._append_status_ui(self._t("update_check_failed_status", error=self._localize_runtime_message(exc)))
 
         run_in_thread(worker)
 
@@ -350,7 +353,7 @@ class S2TApp:
                 self._call_in_ui(ask_and_update)
 
             except Exception as exc:
-                error_text = str(exc)
+                error_text = self._localize_runtime_message(exc)
                 self._call_in_ui(
                     lambda msg=error_text: self.view.show_error(
                         self._t("update_title"),
@@ -389,9 +392,9 @@ class S2TApp:
         except Exception as exc:
             self.view.show_error(
                 self._t("update_title"),
-                self._t("restart_failed", error=exc),
+                self._t("restart_failed", error=self._localize_runtime_message(exc)),
             )
-            self.view.append_status(self._t("restart_error_status", error=exc))
+            self.view.append_status(self._t("restart_error_status", error=self._localize_runtime_message(exc)))
             self.view.set_action_buttons_enabled(True)
 
     def _perform_update(self) -> None:
@@ -408,7 +411,7 @@ class S2TApp:
             )
 
         except Exception as exc:
-            error_text = str(exc)
+            error_text = self._localize_runtime_message(exc)
             self._call_in_ui(
                 lambda msg=error_text: self.view.show_error(
                     self._t("update_title"),

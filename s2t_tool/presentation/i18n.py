@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import locale
+import re
 
 
 STRINGS: dict[str, dict[str, str]] = {
@@ -121,3 +122,116 @@ def tr(key: str, language: str, **kwargs: object) -> str:
     catalog = STRINGS.get(language, STRINGS["en"])
     template = catalog.get(key, STRINGS["en"].get(key, key))
     return template.format(**kwargs)
+
+
+def localize_runtime_message(message: str, language: str) -> str:
+    if language != "ru":
+        return message
+
+    patterns: list[tuple[re.Pattern[str], str | callable]] = [
+        (
+            re.compile(r"^Source LG sheet is empty$"),
+            "Лист Source LG пуст.",
+        ),
+        (
+            re.compile(r"^Missing columns in Source LG: (?P<columns>.+)$"),
+            lambda m: f"На листе Source LG отсутствуют обязательные колонки: {m.group('columns')}",
+        ),
+        (
+            re.compile(r"^Pre-transforms sheet must contain at least double header$"),
+            "На листе Pre-transforms должен быть двойной заголовок.",
+        ),
+        (
+            re.compile(r"^Pre-transforms row has empty target table$"),
+            "На листе Pre-transforms есть строка без target table.",
+        ),
+        (
+            re.compile(r"^Joins must contain double header and data rows$"),
+            "Лист Joins должен содержать двойной заголовок и строки с данными.",
+        ),
+        (
+            re.compile(r"^Joins row must contain table_name and load_code$"),
+            "На листе Joins в строке должны быть заполнены table_name и load_code.",
+        ),
+        (
+            re.compile(r"^Mappings sheet must contain header and data rows$"),
+            "Лист Mappings должен содержать заголовок и строки с данными.",
+        ),
+        (
+            re.compile(r"^Mappings row must contain load_code, table_name, attribute_code$"),
+            "На листе Mappings в строке должны быть заполнены load_code, table_name и attribute_code.",
+        ),
+        (
+            re.compile(
+                r"^Conflicting attribute_name inside table '(?P<table>[^']+)' "
+                r"for attribute_code '(?P<code>[^']+)': (?P<names>.+)$"
+            ),
+            lambda m: (
+                f"Лист Mappings: для таблицы '{m.group('table')}' "
+                f"у атрибута '{m.group('code')}' заданы разные описания: {m.group('names')}"
+            ),
+        ),
+        (
+            re.compile(
+                r"^Sheet '(?P<sheet>[^']+)' not found in (?P<path>.+)\. "
+                r"Available sheets: (?P<available>.+)$"
+            ),
+            lambda m: (
+                f"Не найден лист '{m.group('sheet')}' в файле {m.group('path')}. "
+                f"Доступные листы: {m.group('available')}"
+            ),
+        ),
+        (
+            re.compile(
+                r"^Branch '(?P<branch>[^']+)' is not allowed\. "
+                r"Allowed branch names must start with '(?P<prefix>[^']+)' "
+                r"or be inside namespace '(?P<debug>[^']+)'\.$"
+            ),
+            lambda m: (
+                f"Ветка '{m.group('branch')}' недопустима. "
+                f"Имя ветки должно начинаться с '{m.group('prefix')}' "
+                f"или находиться в пространстве '{m.group('debug')}'."
+            ),
+        ),
+        (
+            re.compile(r"^Excel file not found: (?P<path>.+)$"),
+            lambda m: f"Excel-файл не найден: {m.group('path')}",
+        ),
+        (
+            re.compile(
+                r"^Excel file not found for product '(?P<product>[^']+)'\. "
+                r"Expected file like: (?P<pattern>.+) in (?P<dir>.+)$"
+            ),
+            lambda m: (
+                f"Не найден Excel для продукта '{m.group('product')}'. "
+                f"Ожидался файл вида {m.group('pattern')} в {m.group('dir')}"
+            ),
+        ),
+        (
+            re.compile(r"^Diff Excel cannot be used for PUT\. Use the normal generated Excel file instead\.$"),
+            "Diff-файл Excel нельзя использовать для отправки. Используй обычный сгенерированный Excel.",
+        ),
+        (
+            re.compile(
+                r"^Excel generated from a commit hash cannot be used for PUT\. "
+                r"Run GET for a branch and use that Excel file instead\.$"
+            ),
+            "Excel, полученный по хешу коммита, нельзя использовать для отправки. Сначала выполни получение для ветки.",
+        ),
+        (
+            re.compile(r"^Version must not be empty$"),
+            "Версия не должна быть пустой.",
+        ),
+        (
+            re.compile(r"^Invalid version format: (?P<version>.+)$"),
+            lambda m: f"Некорректный формат версии: {m.group('version')}",
+        ),
+    ]
+
+    for pattern, replacement in patterns:
+        match = pattern.match(message)
+        if not match:
+            continue
+        return replacement(match) if callable(replacement) else replacement
+
+    return message
