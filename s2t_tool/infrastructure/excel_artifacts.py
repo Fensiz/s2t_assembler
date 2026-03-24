@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from s2t_tool.domain.file_naming import find_excel_candidates
+
 
 def find_latest_excel_file(
     excel_dir: Path,
@@ -24,7 +26,7 @@ def find_latest_excel_file(
 
     candidates: list[Path] = []
     for pattern in patterns:
-        candidates.extend(excel_dir.glob(pattern))
+        candidates.extend(find_excel_candidates(excel_dir, [pattern]))
 
     if not diff_mode:
         candidates = [path for path in candidates if not path.name.lower().endswith("_diff.xlsx")]

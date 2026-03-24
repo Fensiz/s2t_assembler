@@ -74,6 +74,21 @@ def ensure_put_compatible_excel(input_excel: Path) -> None:
         )
 
 
+def find_excel_candidates(excel_dir: Path, patterns: list[str]) -> list[Path]:
+    regexes = [
+        re.compile("^" + pattern.replace(".", r"\.").replace("*", ".*") + "$", flags=re.IGNORECASE)
+        for pattern in patterns
+    ]
+
+    candidates: list[Path] = []
+    for path in excel_dir.iterdir():
+        if not path.is_file():
+            continue
+        if any(regex.match(path.name) for regex in regexes):
+            candidates.append(path)
+    return candidates
+
+
 def resolve_input_excel_path(
     config: dict,
     product_name: str,
@@ -95,7 +110,11 @@ def resolve_input_excel_path(
     debug_mode = is_debug_branch(resolved_branch, default_branch)
 
     if explicit_version is not None:
-        return excel_dir / build_branch_excel_filename(product_name, explicit_version, debug_mode)
+        expected_name = build_branch_excel_filename(product_name, explicit_version, debug_mode)
+        candidates = find_excel_candidates(excel_dir, [expected_name])
+        if candidates:
+            return candidates[0]
+        return excel_dir / expected_name
 
     if debug_mode:
         pattern = f"S2T_USL_{product_name.upper()}_v*_debug.xlsx"
@@ -104,7 +123,7 @@ def resolve_input_excel_path(
 
     candidates = sorted(
         [
-            p for p in excel_dir.glob(pattern)
+            p for p in find_excel_candidates(excel_dir, [pattern])
             if not p.name.lower().endswith("_diff.xlsx") and "_commit_" not in p.name.lower()
         ],
         key=lambda p: p.stat().st_mtime,
