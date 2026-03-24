@@ -122,6 +122,8 @@ class UpdateService:
             cwd=cwd,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             env=env,
             timeout=60,
         )
@@ -265,6 +267,8 @@ $Shortcut.Save()
             ],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
         )
 
         stdout = result.stdout.strip()

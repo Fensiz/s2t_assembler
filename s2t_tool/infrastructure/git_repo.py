@@ -28,6 +28,8 @@ def run_git(args: list[str], cwd: Path | None = None, log=None) -> str:
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         bufsize=1,
     )
 
@@ -64,6 +66,8 @@ def remote_branch_exists(repo_url: str, branch: str) -> bool:
         ["git", "ls-remote", "--heads", repo_url, branch],
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
     )
 
     if result.returncode != 0:
@@ -352,6 +356,8 @@ def has_changes(repo_dir: Path) -> bool:
         cwd=repo_dir,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
     )
     return bool(result.stdout.strip())
 
@@ -370,6 +376,8 @@ def has_changes_excluding(repo_dir: Path, excluded_paths: list[Path] | None = No
         cwd=repo_dir,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
     )
 
     if result.returncode != 0:
