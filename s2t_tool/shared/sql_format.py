@@ -18,12 +18,13 @@ CLAUSE_KEYWORDS = {
     "LEFT JOIN", "RIGHT JOIN", "FULL JOIN", "INNER JOIN", "CROSS JOIN",
     "LEFT OUTER JOIN", "RIGHT OUTER JOIN", "FULL OUTER JOIN",
     "JOIN", "ON", "UNION", "UNION ALL", "WHEN", "ELSE", "AND", "OR",
-    "DISTRIBUTE BY", "SORT BY", "CLUSTER BY", "LATERAL VIEW",
+    "PARTITION BY", "DISTRIBUTE BY", "SORT BY", "CLUSTER BY", "LATERAL VIEW",
 }
 
 MULTIWORD_KEYWORDS = [
     ("GROUP", "BY"),
     ("ORDER", "BY"),
+    ("PARTITION", "BY"),
     ("UNION", "ALL"),
     ("LEFT", "JOIN"),
     ("RIGHT", "JOIN"),
@@ -58,8 +59,11 @@ def format_hive_sql(sql: str) -> str:
     current_parts: list[str] = []
     indent = 0
     paren_depth = 0
+    paren_types: list[str] = []
     clause = ""
     line_indent = 0
+    select_clause_depth = 0
+    last_token_upper = ""
 
     def flush_line(force: bool = False) -> None:
         nonlocal current_parts, line_indent
@@ -69,6 +73,8 @@ def format_hive_sql(sql: str) -> str:
             if clause == "SELECT" and line != "SELECT":
                 extra_indent += 1
             if line.startswith(("ON ", "AND ", "OR ")):
+                extra_indent += 1
+            if paren_types and paren_types[-1] == "window" and line.startswith(("PARTITION BY ", "ORDER BY ")):
                 extra_indent += 1
             lines.append(("    " * max(line_indent + extra_indent, 0)) + line if line else "")
         current_parts = []
@@ -89,9 +95,11 @@ def format_hive_sql(sql: str) -> str:
             current_parts.append(".")
             return
         if token == "(":
-            if current_parts and not current_parts[-1].endswith((" ", "(", ".")):
+            paren_type = classify_paren()
+            if current_parts and not current_parts[-1].endswith((" ", "(", ".")) and paren_type != "function":
                 current_parts.append(" ")
             current_parts.append("(")
+            paren_types.append(paren_type)
             return
         if token == ")":
             if current_parts:
@@ -101,6 +109,17 @@ def format_hive_sql(sql: str) -> str:
         if current_parts and not current_parts[-1].endswith((" ", "(", ".")):
             current_parts.append(" ")
         current_parts.append(token)
+
+    def classify_paren() -> str:
+        if last_token_upper == "OVER":
+            return "window"
+        if last_token_upper == "IN":
+            return "list"
+        if clause == "WITH" and paren_depth == 0:
+            return "subquery"
+        if last_token_upper and re.fullmatch(r"[A-Z_][A-Z0-9_$]*", last_token_upper) and last_token_upper not in KEYWORDS and last_token_upper not in CLAUSE_KEYWORDS:
+            return "function"
+        return "generic"
 
     for token in tokens:
         upper = token.upper()
@@ -127,14 +146,27 @@ def format_hive_sql(sql: str) -> str:
             flush_line()
             add(token_out)
             clause = upper
+            if upper == "SELECT":
+                select_clause_depth = paren_depth
             if upper in {"WITH", "SELECT"}:
                 flush_line()
+            last_token_upper = upper
             continue
 
-        if upper == "," and clause in {"SELECT", "GROUP BY", "ORDER BY", "DISTRIBUTE BY", "SORT BY", "CLUSTER BY"} and paren_depth == 0:
+        if upper == "," and clause == "SELECT" and paren_depth == select_clause_depth:
             add(token_out)
             flush_line()
+            last_token_upper = upper
             continue
+
+        if upper == "," and clause in {"GROUP BY", "ORDER BY", "DISTRIBUTE BY", "SORT BY", "CLUSTER BY"} and paren_depth == 0:
+            add(token_out)
+            flush_line()
+            last_token_upper = upper
+            continue
+
+        if token == ")" and paren_types and paren_types[-1] in {"subquery", "window"} and current_parts:
+            flush_line()
 
         add(token_out)
 
@@ -144,6 +176,10 @@ def format_hive_sql(sql: str) -> str:
         elif token == ")":
             paren_depth = max(paren_depth - 1, 0)
             indent = max(indent - 1, 0)
+            if paren_types:
+                paren_types.pop()
+
+        last_token_upper = upper
 
     flush_line()
     return "\n".join(line.rstrip() for line in lines if line is not None)
