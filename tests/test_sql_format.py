@@ -60,7 +60,7 @@ class SqlFormatTests(unittest.TestCase):
         self.assertIn("\n    JOIN c", formatted)
         self.assertIn("\n        ON b.x = c.x", formatted)
         self.assertIn("\n    WHERE s IN (1, 2)", formatted)
-        self.assertIn("\n        AND e <> '22'\n    ) t", formatted)
+        self.assertIn("\n        AND e <> '22'\n) t", formatted)
         self.assertIn("\nSELECT\n    *\nFROM tdeal123567", formatted)
 
     def test_format_hive_sql_formats_window_function_and_select_list(self) -> None:
@@ -77,7 +77,7 @@ class SqlFormatTests(unittest.TestCase):
         self.assertIn("\n            PARTITION BY SID", formatted)
         self.assertIn("\n            ORDER BY NAME DESC", formatted)
         self.assertIn("\n        ) AS rn", formatted)
-        self.assertIn("\n    ) t", formatted)
+        self.assertIn("\n) t", formatted)
 
     def test_format_hive_sql_keeps_numbers_inside_in_list(self) -> None:
         sql = "SELECT * FROM t WHERE attr IN (16625, 18888)"
@@ -94,8 +94,21 @@ class SqlFormatTests(unittest.TestCase):
         sql = "WITH a AS (SELECT 1), b AS (SELECT 2) SELECT * FROM z"
         formatted = format_hive_sql(sql)
         self.assertIn("WITH\na AS (", formatted)
-        self.assertIn("\n    ),\nb AS (", formatted)
+        self.assertIn("\n),\nb AS (", formatted)
         self.assertIn("\nSELECT\n    *\nFROM z", formatted)
+
+    def test_format_hive_sql_keeps_hivevar_set_syntax(self) -> None:
+        sql = "set hivevar:F_ASD = '222', '2222'; set x = 1;"
+        formatted = format_hive_sql(sql)
+        self.assertIn("set hivevar:F_ASD = '222', '2222';", formatted)
+        self.assertIn("\nset x = 1;", formatted)
+
+    def test_format_hive_sql_aligns_closing_paren_with_join(self) -> None:
+        sql = "SELECT * FROM x JOIN y ON a IN (SELECT id FROM z) WHERE q = 1"
+        formatted = format_hive_sql(sql)
+        self.assertIn("JOIN y", formatted)
+        self.assertIn("\n    ON a IN (", formatted)
+        self.assertIn("\n    )", formatted)
 
 
 if __name__ == "__main__":

@@ -41,7 +41,7 @@ MULTIWORD_KEYWORDS = [
 ]
 
 TOKEN_RE = re.compile(
-    r"/\*.*?\*/|--[^\n]*|'(?:''|[^'])*'|`[^`]*`|\d+(?:\.\d+)?|[A-Za-z_][A-Za-z0-9_$]*|[(),.]|<=|>=|<>|!=|==|[-+*/%<>=]|[^\s]",
+    r"/\*.*?\*/|--[^\n]*|'(?:''|[^'])*'|`[^`]*`|\d+(?:\.\d+)?|[A-Za-z_][A-Za-z0-9_$]*|[(),.:;]|<=|>=|<>|!=|==|[-+*/%<>=]|[^\s]",
     flags=re.DOTALL,
 )
 
@@ -59,26 +59,30 @@ def format_hive_sql(sql: str) -> str:
     current_parts: list[str] = []
     indent = 0
     paren_depth = 0
-    paren_types: list[str] = []
+    paren_types: list[tuple[str, int]] = []
     clause = ""
     line_indent = 0
     select_clause_depth = 0
     last_token_upper = ""
+    next_token_upper = ""
 
     def flush_line(force: bool = False) -> None:
         nonlocal current_parts, line_indent
         line = "".join(current_parts).strip()
         if line or force:
-            extra_indent = 0
-            if clause == "SELECT" and line != "SELECT":
-                extra_indent += 1
-            if line.startswith(("ON ", "AND ", "OR ")):
-                extra_indent += 1
-            if paren_types and paren_types[-1] == "window" and line.startswith(("PARTITION BY ", "ORDER BY ")):
-                extra_indent += 1
-            lines.append(("    " * max(line_indent + extra_indent, 0)) + line if line else "")
+            lines.append(("    " * max(render_indent(line), 0)) + line if line else "")
         current_parts = []
         line_indent = indent
+
+    def render_indent(line: str) -> int:
+        extra_indent = 0
+        if clause == "SELECT" and line != "SELECT":
+            extra_indent += 1
+        if line.startswith(("ON ", "AND ", "OR ")):
+            extra_indent += 1
+        if paren_types and paren_types[-1][0] == "window" and line.startswith(("PARTITION BY ", "ORDER BY ")):
+            extra_indent += 1
+        return line_indent + extra_indent
 
     def add(token: str) -> None:
         nonlocal line_indent
@@ -94,23 +98,35 @@ def format_hive_sql(sql: str) -> str:
                 current_parts[-1] = current_parts[-1].rstrip()
             current_parts.append(".")
             return
+        if token == ":":
+            if current_parts:
+                current_parts[-1] = current_parts[-1].rstrip()
+            current_parts.append(":")
+            return
+        if token == ";":
+            if current_parts:
+                current_parts[-1] = current_parts[-1].rstrip()
+            current_parts.append(";")
+            return
         if token == "(":
             paren_type = classify_paren()
             if current_parts and not current_parts[-1].endswith((" ", "(", ".")) and paren_type != "function":
                 current_parts.append(" ")
             current_parts.append("(")
-            paren_types.append(paren_type)
+            paren_types.append((paren_type, render_indent("".join(current_parts).strip())))
             return
         if token == ")":
             if current_parts:
                 current_parts[-1] = current_parts[-1].rstrip()
             current_parts.append(")")
             return
-        if current_parts and not current_parts[-1].endswith((" ", "(", ".")):
+        if current_parts and not current_parts[-1].endswith((" ", "(", ".", ":")):
             current_parts.append(" ")
         current_parts.append(token)
 
     def classify_paren() -> str:
+        if next_token_upper in {"SELECT", "WITH"}:
+            return "subquery"
         if last_token_upper == "OVER":
             return "window"
         if last_token_upper == "IN":
@@ -121,9 +137,10 @@ def format_hive_sql(sql: str) -> str:
             return "function"
         return "generic"
 
-    for token in tokens:
+    for idx, token in enumerate(tokens):
         upper = token.upper()
         token_out = upper if upper in KEYWORDS or upper in CLAUSE_KEYWORDS else token
+        next_token_upper = tokens[idx + 1].upper() if idx + 1 < len(tokens) else ""
 
         if upper == "CASE":
             add(token_out)
@@ -162,6 +179,13 @@ def format_hive_sql(sql: str) -> str:
             last_token_upper = upper
             continue
 
+        if token == ";":
+            add(token_out)
+            flush_line()
+            clause = ""
+            last_token_upper = ""
+            continue
+
         if upper == "," and clause == "SELECT" and paren_depth == select_clause_depth:
             add(token_out)
             flush_line()
@@ -180,16 +204,18 @@ def format_hive_sql(sql: str) -> str:
             last_token_upper = upper
             continue
 
-        if token == ")" and paren_types and paren_types[-1] in {"subquery", "window"} and current_parts:
+        if token == ")" and paren_types and paren_types[-1][0] in {"subquery", "window"} and current_parts:
             flush_line()
-
-        add(token_out)
+            line_indent = paren_types[-1][1]
+            current_parts.append(")")
+        else:
+            add(token_out)
 
         if token == "(":
             paren_depth += 1
             indent += 1
         elif token == ")":
-            closed_paren_type = paren_types[-1] if paren_types else ""
+            closed_paren_type = paren_types[-1][0] if paren_types else ""
             paren_depth = max(paren_depth - 1, 0)
             indent = max(indent - 1, 0)
             if paren_types:
