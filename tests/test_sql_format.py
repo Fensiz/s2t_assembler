@@ -90,6 +90,13 @@ class SqlFormatTests(unittest.TestCase):
         self.assertIn("a -- comment", formatted)
         self.assertIn("\nFROM t", formatted)
 
+    def test_format_hive_sql_keeps_inline_select_comment_after_comma(self) -> None:
+        sql = "select a as d, --comment\n    c\nfrom e"
+        formatted = format_hive_sql(sql)
+        self.assertIn("a AS d, --comment", formatted)
+        self.assertIn("\n    c", formatted)
+        self.assertIn("\nFROM e", formatted)
+
     def test_format_hive_sql_splits_multiple_ctes(self) -> None:
         sql = "WITH a AS (SELECT 1), b AS (SELECT 2) SELECT * FROM z"
         formatted = format_hive_sql(sql)

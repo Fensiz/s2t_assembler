@@ -174,6 +174,10 @@ def format_hive_sql(sql: str) -> str:
             continue
 
         if token.startswith("--") or token.startswith("/*"):
+            if token.startswith("--") and not current_parts and lines and lines[-1].rstrip().endswith(","):
+                lines[-1] = f"{lines[-1]} {token_out}"
+                last_token_upper = upper
+                continue
             add(token_out)
             flush_line()
             last_token_upper = upper
