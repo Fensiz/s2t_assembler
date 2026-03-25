@@ -227,8 +227,9 @@ def format_hive_sql(sql: str) -> str:
             last_token_upper = upper
             continue
 
-        if token == ")" and paren_types and paren_types[-1][0] in {"subquery", "subquery_expr", "window"} and current_parts:
-            flush_line()
+        if token == ")" and paren_types and paren_types[-1][0] in {"subquery", "subquery_expr", "window"}:
+            if current_parts:
+                flush_line()
             line_indent = paren_types[-1][1]
             current_parts.append(")")
         else:
