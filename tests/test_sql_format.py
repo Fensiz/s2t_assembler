@@ -117,6 +117,14 @@ class SqlFormatTests(unittest.TestCase):
         self.assertIn("\n    ON a IN (", formatted)
         self.assertIn("\n    )", formatted)
 
+    def test_format_hive_sql_aligns_closing_paren_with_left_join(self) -> None:
+        sql = "SELECT * FROM x LEFT JOIN (SELECT id FROM a WHERE q = 1) j ON x.id = j.id"
+        formatted = format_hive_sql(sql)
+        self.assertIn("\nLEFT JOIN (", formatted)
+        self.assertIn("\n    WHERE q = 1", formatted)
+        self.assertIn("\n) j", formatted)
+        self.assertIn("\n    ON x.id = j.id", formatted)
+
 
 if __name__ == "__main__":
     unittest.main()
