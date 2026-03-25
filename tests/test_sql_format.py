@@ -97,6 +97,13 @@ class SqlFormatTests(unittest.TestCase):
         self.assertIn("\n    c", formatted)
         self.assertIn("\nFROM e", formatted)
 
+    def test_format_hive_sql_pulls_leading_commas_to_previous_select_items(self) -> None:
+        sql = "select\n a as a --xxxx\n , b --sss\n, c ---ss"
+        formatted = format_hive_sql(sql)
+        self.assertIn("\n    a AS a, --xxxx", formatted)
+        self.assertIn("\n    b, --sss", formatted)
+        self.assertIn("\n    c ---ss", formatted)
+
     def test_format_hive_sql_splits_multiple_ctes(self) -> None:
         sql = "WITH a AS (SELECT 1), b AS (SELECT 2) SELECT * FROM z"
         formatted = format_hive_sql(sql)

@@ -190,6 +190,18 @@ def format_hive_sql(sql: str) -> str:
             last_token_upper = ""
             continue
 
+        if upper == "," and clause == "SELECT" and paren_depth == select_clause_depth and not current_parts and lines:
+            previous = lines[-1]
+            comment_pos = previous.find("--")
+            if comment_pos >= 0:
+                head = previous[:comment_pos].rstrip()
+                tail = previous[comment_pos:].lstrip()
+                lines[-1] = f"{head}, {tail}"
+            else:
+                lines[-1] = previous.rstrip() + ","
+            last_token_upper = upper
+            continue
+
         if upper == "," and clause == "SELECT" and paren_depth == select_clause_depth:
             add(token_out)
             flush_line()
