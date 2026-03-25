@@ -113,7 +113,12 @@ def format_hive_sql(sql: str) -> str:
             if current_parts and not current_parts[-1].endswith((" ", "(", ".")) and paren_type != "function":
                 current_parts.append(" ")
             current_parts.append("(")
-            paren_types.append((paren_type, render_indent("".join(current_parts).strip())))
+            paren_indent = (
+                line_indent
+                if paren_type == "subquery"
+                else render_indent("".join(current_parts).strip())
+            )
+            paren_types.append((paren_type, paren_indent))
             return
         if token == ")":
             if current_parts:
@@ -126,6 +131,8 @@ def format_hive_sql(sql: str) -> str:
 
     def classify_paren() -> str:
         if next_token_upper in {"SELECT", "WITH"}:
+            if last_token_upper == "IN":
+                return "subquery_expr"
             return "subquery"
         if last_token_upper == "OVER":
             return "window"
@@ -220,7 +227,7 @@ def format_hive_sql(sql: str) -> str:
             last_token_upper = upper
             continue
 
-        if token == ")" and paren_types and paren_types[-1][0] in {"subquery", "window"} and current_parts:
+        if token == ")" and paren_types and paren_types[-1][0] in {"subquery", "subquery_expr", "window"} and current_parts:
             flush_line()
             line_indent = paren_types[-1][1]
             current_parts.append(")")
@@ -236,7 +243,7 @@ def format_hive_sql(sql: str) -> str:
             indent = max(indent - 1, 0)
             if paren_types:
                 paren_types.pop()
-            if closed_paren_type == "subquery" and paren_depth == 0:
+            if closed_paren_type in {"subquery", "subquery_expr"} and paren_depth == 0:
                 clause = "WITH"
 
         last_token_upper = upper

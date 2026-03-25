@@ -132,6 +132,22 @@ class SqlFormatTests(unittest.TestCase):
         self.assertIn("\n) j", formatted)
         self.assertIn("\n    ON x.id = j.id", formatted)
 
+    def test_format_hive_sql_aligns_nested_left_join_subquery_inside_with(self) -> None:
+        sql = (
+            "WITH op AS ("
+            "SELECT h.a AS id, o.b AS b_oper_num, o.c, o.e, d.g "
+            "FROM z h "
+            "JOIN x t ON h.f = t.f "
+            "JOIN c o ON cast(t.y as string) = o.u "
+            "LEFT JOIN (SELECT u, y FROM v WHERE a = '1') d ON d.w = o.w "
+            "WHERE a in (1, 2)"
+            "),"
+        )
+        formatted = format_hive_sql(sql)
+        self.assertIn("\n    LEFT JOIN (", formatted)
+        self.assertIn("\n        WHERE a = '1'", formatted)
+        self.assertIn("\n    ) d", formatted)
+
 
 if __name__ == "__main__":
     unittest.main()
