@@ -14,7 +14,7 @@ KEYWORDS = {
 }
 
 CLAUSE_KEYWORDS = {
-    "SELECT", "FROM", "WHERE", "GROUP BY", "ORDER BY", "HAVING", "LIMIT",
+    "WITH", "SELECT", "FROM", "WHERE", "GROUP BY", "ORDER BY", "HAVING", "LIMIT",
     "LEFT JOIN", "RIGHT JOIN", "FULL JOIN", "INNER JOIN", "CROSS JOIN",
     "LEFT OUTER JOIN", "RIGHT OUTER JOIN", "FULL OUTER JOIN",
     "JOIN", "ON", "UNION", "UNION ALL", "WHEN", "ELSE", "AND", "OR",
@@ -59,16 +59,25 @@ def format_hive_sql(sql: str) -> str:
     indent = 0
     paren_depth = 0
     clause = ""
+    line_indent = 0
 
     def flush_line(force: bool = False) -> None:
-        nonlocal current_parts
+        nonlocal current_parts, line_indent
         line = "".join(current_parts).strip()
         if line or force:
-            extra_indent = 1 if line.startswith(("AND ", "OR ")) else 0
-            lines.append(("    " * max(indent + extra_indent, 0)) + line if line else "")
+            extra_indent = 0
+            if clause == "SELECT" and line != "SELECT":
+                extra_indent += 1
+            if line.startswith(("ON ", "AND ", "OR ")):
+                extra_indent += 1
+            lines.append(("    " * max(line_indent + extra_indent, 0)) + line if line else "")
         current_parts = []
+        line_indent = indent
 
     def add(token: str) -> None:
+        nonlocal line_indent
+        if not current_parts:
+            line_indent = indent
         if token == ",":
             if current_parts:
                 current_parts[-1] = current_parts[-1].rstrip()
@@ -114,13 +123,12 @@ def format_hive_sql(sql: str) -> str:
             add(token_out)
             continue
 
-        if upper in CLAUSE_KEYWORDS and paren_depth == 0:
+        if upper in CLAUSE_KEYWORDS:
             flush_line()
-            if upper in {"WHEN", "ELSE"}:
-                add(token_out)
-            else:
-                add(token_out)
+            add(token_out)
             clause = upper
+            if upper in {"WITH", "SELECT"}:
+                flush_line()
             continue
 
         if upper == "," and clause in {"SELECT", "GROUP BY", "ORDER BY", "DISTRIBUTE BY", "SORT BY", "CLUSTER BY"} and paren_depth == 0:
@@ -132,8 +140,10 @@ def format_hive_sql(sql: str) -> str:
 
         if token == "(":
             paren_depth += 1
+            indent += 1
         elif token == ")":
             paren_depth = max(paren_depth - 1, 0)
+            indent = max(indent - 1, 0)
 
     flush_line()
     return "\n".join(line.rstrip() for line in lines if line is not None)

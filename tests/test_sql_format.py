@@ -47,6 +47,22 @@ class SqlFormatTests(unittest.TestCase):
             self.assertIn("\nFROM", source_sql)
             self.assertIn("\nWHERE", source_sql)
 
+    def test_format_hive_sql_formats_with_subquery(self) -> None:
+        sql = (
+            "WITH any (SELECT a FROM b JOIN c ON b.x = c.x "
+            "WHERE s IN (1, 2) AND e <> '22') t "
+            "SELECT * FROM tdeal123567"
+        )
+        formatted = format_hive_sql(sql)
+        self.assertIn("WITH\nany (", formatted)
+        self.assertIn("\n    SELECT", formatted)
+        self.assertIn("\n        a", formatted)
+        self.assertIn("\n    JOIN c", formatted)
+        self.assertIn("\n        ON b.x = c.x", formatted)
+        self.assertIn("\n    WHERE s IN (1, 2)", formatted)
+        self.assertIn("\n        AND e <> '22') t", formatted)
+        self.assertIn("\nSELECT\n    *\nFROM tdeal123567", formatted)
+
 
 if __name__ == "__main__":
     unittest.main()
