@@ -63,6 +63,7 @@ def format_hive_sql(sql: str) -> str:
     clause = ""
     line_indent = 0
     select_clause_depth = 0
+    predicate_clause_depth = 0
     last_token_upper = ""
     next_token_upper = ""
 
@@ -165,7 +166,7 @@ def format_hive_sql(sql: str) -> str:
             continue
 
         if upper in {"AND", "OR"}:
-            if clause in {"WHERE", "HAVING", "ON"} and paren_depth == select_clause_depth:
+            if clause in {"WHERE", "HAVING", "ON"} and paren_depth == predicate_clause_depth:
                 flush_line()
                 add(token_out)
             else:
@@ -179,6 +180,8 @@ def format_hive_sql(sql: str) -> str:
             clause = upper
             if upper == "SELECT":
                 select_clause_depth = paren_depth
+            if upper in {"WHERE", "HAVING", "ON"}:
+                predicate_clause_depth = paren_depth
             if upper in {"WITH", "SELECT"}:
                 flush_line()
             last_token_upper = upper

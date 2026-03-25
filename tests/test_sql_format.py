@@ -156,6 +156,23 @@ class SqlFormatTests(unittest.TestCase):
         self.assertIn("\n        WHERE a = '1'", formatted)
         self.assertIn("\n    ) d", formatted)
 
+    def test_format_hive_sql_splits_and_in_outer_where_after_subquery(self) -> None:
+        sql = (
+            "WITH TRADE_IDS AS ("
+            "SELECT d, s AS s, d, da "
+            "FROM ("
+            "SELECT ds, TRIM(s) AS s, b, e, "
+            "ROW_NUMBER() OVER (PARTITION BY d ORDER BY da DESC, b DESC) AS rn "
+            "FROM s WHERE d = '2'"
+            ") t "
+            "WHERE rn = 1 AND s IS NOT NULL AND s <> '0'"
+            "),"
+        )
+        formatted = format_hive_sql(sql)
+        self.assertIn("\n    WHERE rn = 1", formatted)
+        self.assertIn("\n        AND s IS NOT NULL", formatted)
+        self.assertIn("\n        AND s <> '0'", formatted)
+
 
 if __name__ == "__main__":
     unittest.main()
