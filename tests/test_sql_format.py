@@ -19,6 +19,14 @@ class SqlFormatTests(unittest.TestCase):
         self.assertIn("\nWHERE", formatted)
         self.assertIn("\n    AND", formatted)
 
+    def test_format_hive_sql_splits_top_level_and_or_but_keeps_nested_group_inline(self) -> None:
+        sql = "SELECT * FROM t WHERE a = 1 AND b = 2 AND (c = 3 OR d = 4) OR e = 5"
+        formatted = format_hive_sql(sql)
+        self.assertIn("\nWHERE a = 1", formatted)
+        self.assertIn("\n    AND b = 2", formatted)
+        self.assertIn("\n    AND (c = 3 OR d = 4)", formatted)
+        self.assertIn("\n    OR e = 5", formatted)
+
     def test_excel_reader_formats_join_sql_when_enabled(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             excel_path = Path(temp_dir) / "input.xlsx"

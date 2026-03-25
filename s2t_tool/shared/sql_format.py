@@ -164,8 +164,12 @@ def format_hive_sql(sql: str) -> str:
             last_token_upper = upper
             continue
 
-        if upper in {"AND", "OR"} and clause not in {"WHERE", "HAVING", "ON"}:
-            add(token_out)
+        if upper in {"AND", "OR"}:
+            if clause in {"WHERE", "HAVING", "ON"} and paren_depth == select_clause_depth:
+                flush_line()
+                add(token_out)
+            else:
+                add(token_out)
             last_token_upper = upper
             continue
 
