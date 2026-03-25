@@ -41,7 +41,7 @@ MULTIWORD_KEYWORDS = [
 ]
 
 TOKEN_RE = re.compile(
-    r"/\*.*?\*/|--[^\n]*|'(?:''|[^'])*'|`[^`]*`|[A-Za-z_][A-Za-z0-9_$]*|[(),.]|<=|>=|<>|!=|==|[-+*/%<>=]|[^\s]",
+    r"/\*.*?\*/|--[^\n]*|'(?:''|[^'])*'|`[^`]*`|\d+(?:\.\d+)?|[A-Za-z_][A-Za-z0-9_$]*|[(),.]|<=|>=|<>|!=|==|[-+*/%<>=]|[^\s]",
     flags=re.DOTALL,
 )
 
@@ -129,6 +129,7 @@ def format_hive_sql(sql: str) -> str:
             add(token_out)
             indent += 1
             clause = ""
+            last_token_upper = upper
             continue
 
         if upper == "END":
@@ -136,10 +137,12 @@ def format_hive_sql(sql: str) -> str:
             indent -= 1
             add(token_out)
             clause = ""
+            last_token_upper = upper
             continue
 
         if upper in {"AND", "OR"} and clause not in {"WHERE", "HAVING", "ON"}:
             add(token_out)
+            last_token_upper = upper
             continue
 
         if upper in CLAUSE_KEYWORDS:
@@ -153,7 +156,19 @@ def format_hive_sql(sql: str) -> str:
             last_token_upper = upper
             continue
 
+        if token.startswith("--") or token.startswith("/*"):
+            add(token_out)
+            flush_line()
+            last_token_upper = upper
+            continue
+
         if upper == "," and clause == "SELECT" and paren_depth == select_clause_depth:
+            add(token_out)
+            flush_line()
+            last_token_upper = upper
+            continue
+
+        if upper == "," and clause == "WITH" and paren_depth == 0:
             add(token_out)
             flush_line()
             last_token_upper = upper
@@ -174,10 +189,13 @@ def format_hive_sql(sql: str) -> str:
             paren_depth += 1
             indent += 1
         elif token == ")":
+            closed_paren_type = paren_types[-1] if paren_types else ""
             paren_depth = max(paren_depth - 1, 0)
             indent = max(indent - 1, 0)
             if paren_types:
                 paren_types.pop()
+            if closed_paren_type == "subquery" and paren_depth == 0:
+                clause = "WITH"
 
         last_token_upper = upper
 

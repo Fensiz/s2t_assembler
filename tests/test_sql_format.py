@@ -79,6 +79,24 @@ class SqlFormatTests(unittest.TestCase):
         self.assertIn("\n        ) AS rn", formatted)
         self.assertIn("\n    ) t", formatted)
 
+    def test_format_hive_sql_keeps_numbers_inside_in_list(self) -> None:
+        sql = "SELECT * FROM t WHERE attr IN (16625, 18888)"
+        formatted = format_hive_sql(sql)
+        self.assertIn("WHERE attr IN (16625, 18888)", formatted)
+
+    def test_format_hive_sql_keeps_comment_on_its_line(self) -> None:
+        sql = "SELECT a -- comment\nFROM t WHERE x = 1"
+        formatted = format_hive_sql(sql)
+        self.assertIn("a -- comment", formatted)
+        self.assertIn("\nFROM t", formatted)
+
+    def test_format_hive_sql_splits_multiple_ctes(self) -> None:
+        sql = "WITH a AS (SELECT 1), b AS (SELECT 2) SELECT * FROM z"
+        formatted = format_hive_sql(sql)
+        self.assertIn("WITH\na AS (", formatted)
+        self.assertIn("\n    ),\nb AS (", formatted)
+        self.assertIn("\nSELECT\n    *\nFROM z", formatted)
+
 
 if __name__ == "__main__":
     unittest.main()
