@@ -11,6 +11,7 @@ from openpyxl.worksheet.worksheet import Worksheet
 from s2t_tool.domain.schema import DEFAULT_SCHEMA, S2TSchema
 from s2t_tool.shared.csv_files import write_csv_rows
 from s2t_tool.shared.files import ensure_dir, write_json_file, write_text_file
+from s2t_tool.shared.sql_format import maybe_format_hive_sql
 from s2t_tool.shared.text import (
     excel_to_repo_header,
     is_row_empty,
@@ -30,11 +31,13 @@ class ExcelRepoReader:
         excel_path: str | Path,
         output_dir: str | Path,
         schema: S2TSchema = DEFAULT_SCHEMA,
+        format_sql: bool = False,
         logger=None,
     ) -> None:
         self.excel_path = Path(excel_path)
         self.output_dir = Path(output_dir)
         self.schema = schema
+        self.format_sql = format_sql
         self.logger = logger
         self.workbook: Workbook = load_workbook(self.excel_path, data_only=True)
 
@@ -206,9 +209,15 @@ class ExcelRepoReader:
             write_json_file(target_dir / "pre-transform.json", payload)
 
             if transformation_sql:
-                write_text_file(target_dir / "preliminary_transformation.sql", transformation_sql)
+                write_text_file(
+                    target_dir / "preliminary_transformation.sql",
+                    maybe_format_hive_sql(transformation_sql, self.format_sql),
+                )
             if settings_sql:
-                write_text_file(target_dir / "settings.sql", settings_sql)
+                write_text_file(
+                    target_dir / "settings.sql",
+                    maybe_format_hive_sql(settings_sql, self.format_sql),
+                )
 
         return root
 
@@ -262,9 +271,15 @@ class ExcelRepoReader:
             write_json_file(join_dir / "join.json", payload)
 
             if source_tables_join_sql:
-                write_text_file(join_dir / "source_tables_join.sql", source_tables_join_sql)
+                write_text_file(
+                    join_dir / "source_tables_join.sql",
+                    maybe_format_hive_sql(source_tables_join_sql, self.format_sql),
+                )
             if settings_table_join_sql:
-                write_text_file(join_dir / "settings_table_join.sql", settings_table_join_sql)
+                write_text_file(
+                    join_dir / "settings_table_join.sql",
+                    maybe_format_hive_sql(settings_table_join_sql, self.format_sql),
+                )
 
         return root
 
@@ -488,11 +503,12 @@ def section_key_from_title(title: str) -> str:
     )
 
 
-def export_excel_to_repo(excel_path: str, output_dir: str, logger=None) -> None:
+def export_excel_to_repo(excel_path: str, output_dir: str, format_sql: bool = False, logger=None) -> None:
     ExcelRepoReader(
         excel_path=excel_path,
         output_dir=output_dir,
         schema=DEFAULT_SCHEMA,
+        format_sql=format_sql,
         logger=logger,
     ).export_all()
 

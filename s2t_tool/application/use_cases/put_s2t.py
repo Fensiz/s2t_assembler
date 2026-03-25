@@ -62,6 +62,7 @@ class PutS2TUseCase:
             export_excel_to_repo(
                 excel_path=str(input_excel),
                 output_dir=str(staged_repo_data_dir),
+                format_sql=command.format_sql,
                 logger=command.logger,
             )
 

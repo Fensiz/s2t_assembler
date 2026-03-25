@@ -285,6 +285,7 @@ class S2TApp:
                 branch_arg=request.branch,
                 version_arg=request.version,
                 keep_version=request.keep_version,
+                format_sql=request.format_sql,
                 excel_arg=None,
                 commit_message_arg=request.commit_message,
                 config=self.config,

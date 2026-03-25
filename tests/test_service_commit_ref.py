@@ -17,6 +17,7 @@ class ServiceCommitRefTests(unittest.TestCase):
             branch_arg="c220991",
             version_arg=None,
             keep_version=False,
+            format_sql=False,
             excel_arg=None,
             commit_message_arg=None,
             config={"default_branch": "s2t/master"},

@@ -35,6 +35,7 @@ def handle_put(
     branch_arg: str | None,
     version_arg: str | None,
     keep_version: bool,
+    format_sql: bool,
     excel_arg: str | None,
     commit_message_arg: str | None,
     config: dict[str, Any],
@@ -46,6 +47,7 @@ def handle_put(
             branch_arg=branch_arg,
             version_arg=version_arg,
             keep_version=keep_version,
+            format_sql=format_sql,
             excel_arg=excel_arg,
             commit_message_arg=commit_message_arg,
             config=config,
@@ -70,6 +72,7 @@ def build_parser() -> argparse.ArgumentParser:
     put_parser.add_argument("--branch", default=None)
     put_parser.add_argument("--version", default=None)
     put_parser.add_argument("--keep-version", action="store_true")
+    put_parser.add_argument("--format-sql", action="store_true")
     put_parser.add_argument("--excel", default=None)
     put_parser.add_argument("--message", default=None)
     return parser
@@ -95,6 +98,7 @@ def main() -> None:
             args.branch,
             args.version,
             args.keep_version,
+            args.format_sql,
             args.excel,
             args.message,
             config=config,

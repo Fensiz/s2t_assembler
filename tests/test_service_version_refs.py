@@ -126,6 +126,7 @@ class ServiceVersionRefTests(unittest.TestCase):
                 branch_arg="s2t/master",
                 version_arg=None,
                 keep_version=True,
+                format_sql=False,
                 excel_arg=str(excel_path),
                 commit_message_arg=None,
                 config=config,
@@ -173,13 +174,19 @@ class ServiceVersionRefTests(unittest.TestCase):
                 branch_arg="s2t/master",
                 version_arg=None,
                 keep_version=True,
+                format_sql=False,
                 excel_arg=str(excel_path),
                 commit_message_arg=None,
                 config=config,
                 logger=None,
             )
 
-            def fake_export_excel_to_repo(excel_path: str, output_dir: str, logger=None) -> None:
+            def fake_export_excel_to_repo(
+                excel_path: str,
+                output_dir: str,
+                format_sql: bool = False,
+                logger=None,
+            ) -> None:
                 target = Path(output_dir)
                 target.mkdir(parents=True, exist_ok=True)
                 (target / "payload.json").write_text('{"after":true}', encoding="utf-8")

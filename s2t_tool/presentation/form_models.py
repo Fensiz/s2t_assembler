@@ -18,3 +18,4 @@ class PutRequest:
     commit_message: str | None
     version: str | None
     keep_version: bool
+    format_sql: bool
