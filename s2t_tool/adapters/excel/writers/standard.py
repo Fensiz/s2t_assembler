@@ -5,7 +5,7 @@ from typing import Any
 
 from openpyxl import Workbook
 
-from s2t_tool.adapters.excel.writer_diff import (
+from s2t_tool.adapters.excel.writers.diff import (
     append_standard_csv_sheet,
     build_change_history_sheet as build_change_history_sheet_section,
 )

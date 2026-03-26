@@ -14,8 +14,14 @@ from s2t_tool.adapters.excel.writers import (
     build_source_lg_sheet as build_source_lg_sheet_sheet,
     build_targets_sheet as build_targets_sheet_sheet,
 )
-from s2t_tool.domain.schema import DEFAULT_SCHEMA, S2TSchema
-from s2t_tool.adapters.excel.writer_style import (
+from s2t_tool.adapters.excel.writers.diff import (
+    build_rich_diff,
+    join_row_key,
+    mapping_row_key,
+    maybe_build_rich_diff,
+    pre_transform_row_key,
+)
+from s2t_tool.adapters.excel.writers.style import (
     WRITER_CONFIG_FILE,
     apply_table_borders,
     append_csv_sheet,
@@ -23,11 +29,7 @@ from s2t_tool.adapters.excel.writer_style import (
     finalize_sheet_style,
     load_writer_config,
 )
-from s2t_tool.adapters.excel.writer_diff import (
-    build_rich_diff,
-    maybe_build_rich_diff,
-)
-from s2t_tool.adapters.excel.writer_diff import join_row_key, mapping_row_key, pre_transform_row_key
+from s2t_tool.domain.schema import DEFAULT_SCHEMA, S2TSchema
 
 
 SCHEMA = DEFAULT_SCHEMA

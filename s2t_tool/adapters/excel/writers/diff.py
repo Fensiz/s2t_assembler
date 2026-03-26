@@ -9,7 +9,7 @@ from openpyxl import Workbook
 from openpyxl.cell.rich_text import CellRichText, TextBlock
 from openpyxl.cell.text import InlineFont
 
-from s2t_tool.adapters.excel.writer_style import append_csv_sheet, create_sheet, finalize_sheet_style
+from s2t_tool.adapters.excel.writers.style import append_csv_sheet, create_sheet, finalize_sheet_style
 from s2t_tool.shared.files import read_json_file
 
 
