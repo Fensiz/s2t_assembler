@@ -10,7 +10,6 @@ from s2t_tool.use_cases.commands import GetCommand, PutCommand
 from s2t_tool.use_cases.results import RecentItem
 from s2t_tool.app.bootstrap import AppContainer
 from s2t_tool.domain.branching import is_commit_ref
-from s2t_tool.adapters.system.initial_setup import InitialSetupService
 from s2t_tool.adapters.system.os_runtime import (
     open_directory_in_os,
     open_file_in_os,
@@ -29,8 +28,6 @@ class S2TController:
         self.config = container.config
         self.language = detect_language(self.config.language)
 
-        self.container.update_service.logger = self._ui_logger
-
         self.view.bind_actions(
             on_get=self.run_get,
             on_put=self.run_put,
@@ -42,10 +39,8 @@ class S2TController:
         self._fill_recent_items()
 
         try:
-            InitialSetupService(
-                self.config,
-                logger=self._ui_logger,
-            ).ensure_initial_setup()
+            self.container.lifecycle.initial_setup_service.logger = self._ui_logger
+            self.container.lifecycle.ensure_initial_setup()
         except Exception as exc:
             self.view.append_status(self._t("initial_setup_skipped", error=exc))
 
@@ -225,10 +220,11 @@ class S2TController:
     def _check_updates_on_start(self) -> None:
         def worker() -> None:
             try:
-                available, latest_version = self.container.update_service.check_update()
-                self._call_in_ui(lambda: self.view.set_update_available(available, latest_version))
-                if available and latest_version:
-                    self._append_status_ui(self._t("update_available_status", version=latest_version))
+                self.container.lifecycle.update_service.logger = self._ui_logger
+                result = self.container.lifecycle.check_updates()
+                self._call_in_ui(lambda: self.view.set_update_available(result.available, result.latest_version))
+                if result.available and result.latest_version:
+                    self._append_status_ui(self._t("update_available_status", version=result.latest_version))
             except Exception as exc:
                 self._append_status_ui(self._t("update_check_failed_status", error=self._localize_runtime_message(exc)))
 
@@ -237,9 +233,10 @@ class S2TController:
     def _on_version_click(self, event) -> None:
         def worker() -> None:
             try:
-                available, latest_version = self.container.update_service.check_update()
-                self._call_in_ui(lambda: self.view.set_update_available(available, latest_version))
-                if not available:
+                self.container.lifecycle.update_service.logger = self._ui_logger
+                result = self.container.lifecycle.check_updates()
+                self._call_in_ui(lambda: self.view.set_update_available(result.available, result.latest_version))
+                if not result.available:
                     self._call_in_ui(
                         lambda: self.view.show_info(
                             self._t("update_title"),
@@ -248,7 +245,7 @@ class S2TController:
                     )
                     return
 
-                message = self._t("new_version_available", version=latest_version)
+                message = self._t("new_version_available", version=result.latest_version)
 
                 def ask_and_update() -> None:
                     confirmed = self.view.ask_yes_no(self._t("update_title"), message)
@@ -293,7 +290,8 @@ class S2TController:
 
     def _perform_update(self) -> None:
         try:
-            updated_app_path = self.container.update_service.perform_update()
+            self.container.lifecycle.update_service.logger = self._ui_logger
+            updated_app_path = self.container.lifecycle.install_update()
             self._append_status_ui(self._t("update_installed_restart"))
             self._call_in_ui(lambda path=updated_app_path: self._restart_with_updated_app(path))
         except Exception as exc:

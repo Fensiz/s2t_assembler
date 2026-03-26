@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from s2t_tool.app.lifecycle import AppLifecycleService
 from s2t_tool.use_cases.service import S2TService
 from s2t_tool.use_cases.settings import AppConfig
 from s2t_tool.adapters.facades import (
@@ -12,6 +13,7 @@ from s2t_tool.adapters.facades import (
     RecentItemsAdapter,
 )
 from s2t_tool.adapters.config.loader import load_app_config
+from s2t_tool.adapters.system.initial_setup import InitialSetupService
 from s2t_tool.adapters.system.update_service import UpdateService
 
 
@@ -22,7 +24,7 @@ class AppContainer:
     paths: DefaultPathResolver
     artifacts: ExcelArtifactAdapter
     recent_items: RecentItemsAdapter
-    update_service: UpdateService
+    lifecycle: AppLifecycleService
 
 
 def build_container(config_path: str | None = None, logger=None) -> AppContainer:
@@ -36,11 +38,16 @@ def build_container(config_path: str | None = None, logger=None) -> AppContainer
     artifacts = ExcelArtifactAdapter()
     recent_items = RecentItemsAdapter()
     update_service = UpdateService(config, logger=logger)
+    initial_setup_service = InitialSetupService(config, logger=logger)
+    lifecycle = AppLifecycleService(
+        initial_setup_service=initial_setup_service,
+        update_service=update_service,
+    )
     return AppContainer(
         config=config,
         service=service,
         paths=paths,
         artifacts=artifacts,
         recent_items=recent_items,
-        update_service=update_service,
+        lifecycle=lifecycle,
     )
