@@ -5,6 +5,15 @@ from typing import Any
 
 from openpyxl import Workbook
 
+from s2t_tool.adapters.excel.sheets import (
+    build_change_history_sheet as build_change_history_sheet_sheet,
+    build_joins_sheet as build_joins_sheet_sheet,
+    build_mappings_sheet as build_mappings_sheet_sheet,
+    build_metadata_sheet as build_metadata_sheet_sheet,
+    build_pre_transforms_sheet as build_pre_transforms_sheet_sheet,
+    build_source_lg_sheet as build_source_lg_sheet_sheet,
+    build_targets_sheet as build_targets_sheet_sheet,
+)
 from s2t_tool.domain.schema import DEFAULT_SCHEMA, S2TSchema
 from s2t_tool.adapters.excel.writer_style import (
     WRITER_CONFIG_FILE,
@@ -14,21 +23,11 @@ from s2t_tool.adapters.excel.writer_style import (
     finalize_sheet_style,
     load_writer_config,
 )
-from s2t_tool.adapters.excel.writer_sections import (
-    build_joins_sheet as build_joins_sheet_section,
-    build_mappings_sheet as build_mappings_sheet_section,
-    build_metadata_sheet as build_metadata_sheet_section,
-    build_pre_transforms_sheet as build_pre_transforms_sheet_section,
-)
 from s2t_tool.adapters.excel.writer_diff import (
-    append_standard_csv_sheet,
-    build_change_history_sheet as build_change_history_sheet_section,
     build_rich_diff,
-    join_row_key,
-    mapping_row_key,
     maybe_build_rich_diff,
-    pre_transform_row_key,
 )
+from s2t_tool.adapters.excel.writer_diff import join_row_key, mapping_row_key, pre_transform_row_key
 
 
 SCHEMA = DEFAULT_SCHEMA
@@ -65,7 +64,7 @@ def build_change_history_sheet(
     config: dict[str, Any],
     diff_repo_dir: str | None = None,
 ) -> None:
-    build_change_history_sheet_section(
+    build_change_history_sheet_sheet(
         wb=wb,
         repo_dir=repo_dir,
         config=config,
@@ -84,12 +83,12 @@ def build_source_lg_sheet(
     config: dict[str, Any],
     diff_repo_dir: str | None = None,
 ) -> None:
-    append_standard_csv_sheet(
+    build_source_lg_sheet_sheet(
         wb=wb,
-        sheet_name=SOURCE_LG_SHEET,
-        csv_name=SOURCE_LG_CSV,
         repo_dir=repo_dir,
         config=config,
+        source_lg_sheet=SOURCE_LG_SHEET,
+        source_lg_csv=SOURCE_LG_CSV,
         pre_transforms_sheet=PRE_TRANSFORMS_SHEET,
         joins_sheet=JOINS_SHEET,
         mappings_sheet=MAPPINGS_SHEET,
@@ -103,12 +102,12 @@ def build_targets_sheet(
     config: dict[str, Any],
     diff_repo_dir: str | None = None,
 ) -> None:
-    append_standard_csv_sheet(
+    build_targets_sheet_sheet(
         wb=wb,
-        sheet_name=TARGETS_SHEET,
-        csv_name=TARGETS_CSV,
         repo_dir=repo_dir,
         config=config,
+        targets_sheet=TARGETS_SHEET,
+        targets_csv=TARGETS_CSV,
         pre_transforms_sheet=PRE_TRANSFORMS_SHEET,
         joins_sheet=JOINS_SHEET,
         mappings_sheet=MAPPINGS_SHEET,
@@ -126,7 +125,7 @@ def build_pre_transforms_sheet(
     config: dict[str, Any],
     diff_repo_dir: str | None = None,
 ) -> None:
-    build_pre_transforms_sheet_section(
+    build_pre_transforms_sheet_sheet(
         wb=wb,
         repo_dir=repo_dir,
         config=config,
@@ -152,7 +151,7 @@ def build_joins_sheet(
     config: dict[str, Any],
     diff_repo_dir: str | None = None,
 ) -> None:
-    build_joins_sheet_section(
+    build_joins_sheet_sheet(
         wb=wb,
         repo_dir=repo_dir,
         config=config,
@@ -178,7 +177,7 @@ def build_mappings_sheet(
     config: dict[str, Any],
     diff_repo_dir: str | None = None,
 ) -> None:
-    build_mappings_sheet_section(
+    build_mappings_sheet_sheet(
         wb=wb,
         repo_dir=repo_dir,
         config=config,
@@ -206,7 +205,7 @@ def build_metadata_sheet(
     config: dict[str, Any],
     diff_commit: str | None = None,
 ) -> None:
-    build_metadata_sheet_section(
+    build_metadata_sheet_sheet(
         wb=wb,
         config=config,
         sheet_name=METADATA_SHEET,
