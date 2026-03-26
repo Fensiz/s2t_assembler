@@ -197,6 +197,13 @@ class SqlFormatTests(unittest.TestCase):
         self.assertIn("\n    AND date BETWEEN a AND b", formatted)
         self.assertIn("\n    AND y = 2", formatted)
 
+    def test_format_hive_sql_keeps_distinct_on_select_line(self) -> None:
+        sql = "SELECT DISTINCT a, b FROM t"
+        formatted = format_hive_sql(sql)
+        self.assertIn("SELECT DISTINCT", formatted)
+        self.assertNotIn("SELECT\n    DISTINCT", formatted)
+        self.assertIn("\n    a,", formatted)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -80,7 +80,7 @@ def format_hive_sql(sql: str) -> str:
     def render_indent(line: str) -> int:
         extra_indent = 0
         in_window_line = bool(paren_types and paren_types[-1][0] == "window" and line.startswith(("PARTITION BY ", "ORDER BY ", ")")))
-        if active_select_depth is not None and line_indent >= active_select_depth and line != "SELECT" and not in_window_line:
+        if active_select_depth is not None and line_indent >= active_select_depth and not line.startswith("SELECT") and not in_window_line:
             extra_indent += 1
         if line.startswith(("ON ", "AND ", "OR ")):
             extra_indent += 1
@@ -189,6 +189,12 @@ def format_hive_sql(sql: str) -> str:
             last_token_upper = upper
             continue
 
+        if upper == "DISTINCT" and active_select_depth == paren_depth and current_parts == ["SELECT"]:
+            add(token_out)
+            flush_line()
+            last_token_upper = upper
+            continue
+
         if upper in CLAUSE_KEYWORDS:
             flush_line()
             add(token_out)
@@ -200,7 +206,7 @@ def format_hive_sql(sql: str) -> str:
                 active_select_depth = None
             if upper in {"WHERE", "HAVING", "ON"}:
                 predicate_clause_depth = paren_depth
-            if upper in {"WITH", "SELECT"}:
+            if upper == "WITH" or (upper == "SELECT" and next_token_upper != "DISTINCT"):
                 flush_line()
             last_token_upper = upper
             continue
