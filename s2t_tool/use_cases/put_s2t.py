@@ -93,6 +93,7 @@ class PutS2TUseCase:
 
         version_rel_path = version_path.relative_to(repo_dir)
         if not self.repository.has_changes_excluding(repo_dir, excluded_paths=[version_rel_path]):
+            write_repo_version(version_path, original_version)
             if command.logger:
                 command.logger("No content changes detected. Version was not bumped.")
                 command.logger("Nothing to commit.")
