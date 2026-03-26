@@ -10,12 +10,18 @@ VERSIONED_PYZ_FILE := $(RELEASES_DIR)/$(APP_NAME)-$(APP_VERSION).pyz
 LATEST_JSON := $(RELEASES_DIR)/latest.json
 RUNTIME_FILES := app_config.json metadata.json writer_config.json
 
-.PHONY: all clean prepare pyz deploy
+.PHONY: all clean prepare test check pyz deploy
 
 all: pyz
 
 clean:
 	rm -rf $(DIST_DIR) $(STAGING_DIR)
+
+test:
+	$(PYTHON) -m unittest discover -s tests -v
+
+check: test
+	PYTHONPYCACHEPREFIX=/tmp/pycache $(PYTHON) -m py_compile $$(find s2t_tool -name '*.py' | sort)
 
 $(DIST_DIR):
 	mkdir -p $(DIST_DIR)
