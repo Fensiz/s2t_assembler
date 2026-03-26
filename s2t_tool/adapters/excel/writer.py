@@ -1,14 +1,9 @@
 from __future__ import annotations
 
-from difflib import SequenceMatcher
 from pathlib import Path
-import re
 from typing import Any
 
 from openpyxl import Workbook
-from openpyxl.cell.rich_text import CellRichText, TextBlock
-from openpyxl.cell.text import InlineFont
-from openpyxl.worksheet.worksheet import Worksheet
 
 from s2t_tool.domain.schema import DEFAULT_SCHEMA, S2TSchema
 from s2t_tool.adapters.excel.writer_style import (
@@ -24,9 +19,16 @@ from s2t_tool.adapters.excel.writer_sections import (
     build_mappings_sheet as build_mappings_sheet_section,
     build_metadata_sheet as build_metadata_sheet_section,
     build_pre_transforms_sheet as build_pre_transforms_sheet_section,
-    resolve_attribute_name,
 )
-from s2t_tool.shared.files import read_json_file
+from s2t_tool.adapters.excel.writer_diff import (
+    append_standard_csv_sheet,
+    build_change_history_sheet as build_change_history_sheet_section,
+    build_rich_diff,
+    join_row_key,
+    mapping_row_key,
+    maybe_build_rich_diff,
+    pre_transform_row_key,
+)
 
 
 SCHEMA = DEFAULT_SCHEMA
@@ -56,95 +58,6 @@ ST_DECODER_SHEET = SCHEMA.st_decoder_sheet
 ST_FILTER_SHEET = SCHEMA.st_filter_sheet
 METADATA_SHEET = SCHEMA.metadata_sheet
 
-RED_FONT = InlineFont(color="FFFF0000", strike=True)
-GREEN_FONT = InlineFont(color="FF008000")
-
-
-# ============================================================
-# Diff helpers
-# ============================================================
-
-def build_rich_diff(old_text: str | None, new_text: str | None) -> CellRichText | str:
-    old_value = "" if old_text is None else str(old_text)
-    new_value = "" if new_text is None else str(new_text)
-
-    if old_value == new_value:
-        return new_value
-
-    old_tokens = _diff_tokens(old_value)
-    new_tokens = _diff_tokens(new_value)
-    matcher = SequenceMatcher(a=old_tokens, b=new_tokens)
-    rich = CellRichText()
-
-    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-        old_chunk = "".join(old_tokens[i1:i2])
-        new_chunk = "".join(new_tokens[j1:j2])
-
-        if tag == "equal":
-            if old_chunk:
-                rich.append(old_chunk)
-        elif tag == "delete":
-            if old_chunk:
-                rich.append(TextBlock(RED_FONT, old_chunk))
-        elif tag == "insert":
-            if new_chunk:
-                rich.append(TextBlock(GREEN_FONT, new_chunk))
-        elif tag == "replace":
-            if old_chunk:
-                rich.append(TextBlock(RED_FONT, old_chunk))
-            if new_chunk:
-                rich.append(TextBlock(GREEN_FONT, new_chunk))
-
-    return rich
-
-
-def _diff_tokens(value: str) -> list[str]:
-    if "\n" in value:
-        return value.splitlines(keepends=True)
-
-    token_re = re.compile(r"'[^']*'|\s+|[(),]|[^\s(),]+")
-    tokens = token_re.findall(value)
-    return tokens or [value]
-
-
-def maybe_build_rich_diff(
-    diff_enabled: bool,
-    old_value: str | None,
-    new_value: str | None,
-) -> str | CellRichText:
-    """
-    Return plain text in normal mode and rich diff in diff mode.
-    """
-    new_text = "" if new_value is None else str(new_value)
-
-    if not diff_enabled:
-        return new_text
-
-    return build_rich_diff(old_value, new_text)
-
-
-def normalize_key_part(value: object) -> str:
-    return "" if value is None else str(value)
-
-
-def join_row_key(table_name: str, load_code: str) -> tuple[str, str]:
-    return (
-        normalize_key_part(table_name),
-        normalize_key_part(load_code),
-    )
-
-
-def pre_transform_row_key(target_table: str) -> str:
-    return normalize_key_part(target_table)
-
-
-def mapping_row_key(load_code: str, table_name: str, attribute_code: str) -> tuple[str, str, str]:
-    return (
-        normalize_key_part(load_code),
-        normalize_key_part(table_name),
-        normalize_key_part(attribute_code),
-    )
-
 
 def build_change_history_sheet(
     wb: Workbook,
@@ -152,29 +65,17 @@ def build_change_history_sheet(
     config: dict[str, Any],
     diff_repo_dir: str | None = None,
 ) -> None:
-    path = repo_dir / CHANGE_HISTORY_JSON
-    entries = read_json_file(path, default=[])
-    diff_enabled = diff_repo_dir is not None
-    old_entries: list[dict[str, Any]] = []
-    if diff_enabled:
-        old_entries = read_json_file(Path(diff_repo_dir) / CHANGE_HISTORY_JSON, default=[]) or []
-    sheet = create_sheet(wb, CHANGE_HISTORY_SHEET)
-
-    sheet.append(["Author", "Date", "Version", "Description", "Jira ticket"])
-
-    for row_idx, entry in enumerate(entries):
-        old_entry = old_entries[row_idx] if row_idx < len(old_entries) else {}
-        sheet.append(
-            [
-                maybe_build_rich_diff(diff_enabled, old_entry.get("author"), entry.get("author")),
-                maybe_build_rich_diff(diff_enabled, old_entry.get("date"), entry.get("date")),
-                maybe_build_rich_diff(diff_enabled, old_entry.get("version"), entry.get("version")),
-                maybe_build_rich_diff(diff_enabled, old_entry.get("description"), entry.get("description")),
-                maybe_build_rich_diff(diff_enabled, old_entry.get("jira_ticket"), entry.get("jira_ticket")),
-            ]
-        )
-
-    finalize_sheet_style(sheet, config, CHANGE_HISTORY_SHEET, PRE_TRANSFORMS_SHEET, JOINS_SHEET, MAPPINGS_SHEET)
+    build_change_history_sheet_section(
+        wb=wb,
+        repo_dir=repo_dir,
+        config=config,
+        change_history_json=CHANGE_HISTORY_JSON,
+        change_history_sheet=CHANGE_HISTORY_SHEET,
+        pre_transforms_sheet=PRE_TRANSFORMS_SHEET,
+        joins_sheet=JOINS_SHEET,
+        mappings_sheet=MAPPINGS_SHEET,
+        diff_repo_dir=diff_repo_dir,
+    )
 
 
 def build_source_lg_sheet(
@@ -183,17 +84,16 @@ def build_source_lg_sheet(
     config: dict[str, Any],
     diff_repo_dir: str | None = None,
 ) -> None:
-    append_csv_sheet(
-        wb,
-        SOURCE_LG_SHEET,
-        repo_dir / SOURCE_LG_CSV,
-        config,
-        True,
-        PRE_TRANSFORMS_SHEET,
-        JOINS_SHEET,
-        MAPPINGS_SHEET,
-        diff_csv_path=(Path(diff_repo_dir) / SOURCE_LG_CSV) if diff_repo_dir else None,
-        maybe_build_rich_diff=maybe_build_rich_diff,
+    append_standard_csv_sheet(
+        wb=wb,
+        sheet_name=SOURCE_LG_SHEET,
+        csv_name=SOURCE_LG_CSV,
+        repo_dir=repo_dir,
+        config=config,
+        pre_transforms_sheet=PRE_TRANSFORMS_SHEET,
+        joins_sheet=JOINS_SHEET,
+        mappings_sheet=MAPPINGS_SHEET,
+        diff_repo_dir=diff_repo_dir,
     )
 
 
@@ -203,17 +103,16 @@ def build_targets_sheet(
     config: dict[str, Any],
     diff_repo_dir: str | None = None,
 ) -> None:
-    append_csv_sheet(
-        wb,
-        TARGETS_SHEET,
-        repo_dir / TARGETS_CSV,
-        config,
-        True,
-        PRE_TRANSFORMS_SHEET,
-        JOINS_SHEET,
-        MAPPINGS_SHEET,
-        diff_csv_path=(Path(diff_repo_dir) / TARGETS_CSV) if diff_repo_dir else None,
-        maybe_build_rich_diff=maybe_build_rich_diff,
+    append_standard_csv_sheet(
+        wb=wb,
+        sheet_name=TARGETS_SHEET,
+        csv_name=TARGETS_CSV,
+        repo_dir=repo_dir,
+        config=config,
+        pre_transforms_sheet=PRE_TRANSFORMS_SHEET,
+        joins_sheet=JOINS_SHEET,
+        mappings_sheet=MAPPINGS_SHEET,
+        diff_repo_dir=diff_repo_dir,
     )
 
 
