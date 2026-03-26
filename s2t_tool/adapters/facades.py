@@ -3,7 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 
 from s2t_tool.use_cases.ports import (
-    ArtifactGateway,
     ExcelGateway,
     PathResolver,
     RecentItemsGateway,
@@ -18,7 +17,6 @@ from s2t_tool.adapters.config.loader import (
     resolve_repo_url,
     resolve_writer_config,
 )
-from s2t_tool.adapters.excel.artifacts import find_latest_excel_file
 from s2t_tool.adapters.excel.reader import export_excel_to_repo
 from s2t_tool.adapters.excel.writer import build_excel_from_repo
 from s2t_tool.adapters.git.repository import (
@@ -97,16 +95,6 @@ class OpenpyxlExcelAdapter(ExcelGateway):
             format_sql=format_sql,
             logger=logger,
         )
-
-
-class ExcelArtifactAdapter(ArtifactGateway):
-    def find_latest_excel(self, excel_dir: Path, product_name: str, diff_mode: bool) -> Path | None:
-        return find_latest_excel_file(
-            excel_dir=excel_dir,
-            product_name=product_name,
-            diff_mode=diff_mode,
-        )
-
 
 class RecentItemsAdapter(RecentItemsGateway):
     def __init__(self, store: RecentItemsStore | None = None) -> None:

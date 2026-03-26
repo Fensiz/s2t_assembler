@@ -3,11 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from s2t_tool.app.lifecycle import AppLifecycleService
+from s2t_tool.app.operations import AppOperationsService
 from s2t_tool.use_cases.service import S2TService
 from s2t_tool.use_cases.settings import AppConfig
 from s2t_tool.adapters.facades import (
     DefaultPathResolver,
-    ExcelArtifactAdapter,
     GitRepositoryAdapter,
     OpenpyxlExcelAdapter,
     RecentItemsAdapter,
@@ -21,8 +21,8 @@ from s2t_tool.adapters.system.update_service import UpdateService
 class AppContainer:
     config: AppConfig
     service: S2TService
+    operations: AppOperationsService
     paths: DefaultPathResolver
-    artifacts: ExcelArtifactAdapter
     recent_items: RecentItemsAdapter
     lifecycle: AppLifecycleService
 
@@ -35,7 +35,7 @@ def build_container(config_path: str | None = None, logger=None) -> AppContainer
         get_use_case=None,
         put_use_case=None,
     )
-    artifacts = ExcelArtifactAdapter()
+    operations = AppOperationsService(service)
     recent_items = RecentItemsAdapter()
     update_service = UpdateService(config, logger=logger)
     initial_setup_service = InitialSetupService(config, logger=logger)
@@ -46,8 +46,8 @@ def build_container(config_path: str | None = None, logger=None) -> AppContainer
     return AppContainer(
         config=config,
         service=service,
+        operations=operations,
         paths=paths,
-        artifacts=artifacts,
         recent_items=recent_items,
         lifecycle=lifecycle,
     )

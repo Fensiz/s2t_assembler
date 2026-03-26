@@ -6,7 +6,6 @@ import sys
 import tkinter as tk
 from pathlib import Path
 
-from s2t_tool.use_cases.commands import GetCommand, PutCommand
 from s2t_tool.use_cases.results import RecentItem
 from s2t_tool.app.bootstrap import AppContainer
 from s2t_tool.domain.branching import is_commit_ref
@@ -186,34 +185,25 @@ class S2TController:
         self.view.append_status(self._t("put_completed", product=request.product_name))
 
     def _worker_get(self, request: GetRequest) -> None:
-        result = self.container.service.handle_get(
-            GetCommand(
-                product_name=request.product_name,
-                branch_arg=request.branch,
-                version_arg=request.version,
-                diff_commit_arg=request.diff_commit,
-                logger=self._ui_logger,
-            )
-        )
-        downloaded_file = self.container.artifacts.find_latest_excel(
-            excel_dir=self.container.paths.excel_output_dir(self.config),
+        result = self.container.operations.run_get(
             product_name=request.product_name,
-            diff_mode=result.diff_mode,
+            branch=request.branch,
+            version=request.version,
+            diff_commit=request.diff_commit,
+            logger=self._ui_logger,
         )
-        self._call_in_ui(lambda: self._after_get_success(request, downloaded_file))
+        self._call_in_ui(lambda: self._after_get_success(request, result.output_excel))
 
     def _worker_put(self, request: PutRequest) -> None:
-        self.container.service.handle_put(
-            PutCommand(
-                product_name=request.product_name,
-                branch_arg=request.branch,
-                version_arg=request.version,
-                keep_version=request.keep_version,
-                format_sql=request.format_sql,
-                excel_arg=None,
-                commit_message_arg=request.commit_message,
-                logger=self._ui_logger,
-            )
+        self.container.operations.run_put(
+            product_name=request.product_name,
+            branch=request.branch,
+            version=request.version,
+            keep_version=request.keep_version,
+            format_sql=request.format_sql,
+            excel_path=None,
+            commit_message=request.commit_message,
+            logger=self._ui_logger,
         )
         self._call_in_ui(lambda: self._after_put_success(request))
 

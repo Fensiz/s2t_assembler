@@ -2,31 +2,28 @@ from __future__ import annotations
 
 import argparse
 
-from s2t_tool.use_cases.commands import GetCommand, PutCommand
 from s2t_tool.app.bootstrap import build_container
 
 
 def handle_get(
-    service,
+    operations,
     product_name: str,
     branch_arg: str | None,
     version_arg: str | None,
     diff_commit_arg: str | None,
     logger=None,
 ) -> None:
-    service.handle_get(
-        GetCommand(
-            product_name=product_name,
-            branch_arg=branch_arg,
-            version_arg=version_arg,
-            diff_commit_arg=diff_commit_arg,
-            logger=logger,
-        )
+    operations.run_get(
+        product_name=product_name,
+        branch=branch_arg,
+        version=version_arg,
+        diff_commit=diff_commit_arg,
+        logger=logger,
     )
 
 
 def handle_put(
-    service,
+    operations,
     product_name: str,
     branch_arg: str | None,
     version_arg: str | None,
@@ -36,17 +33,15 @@ def handle_put(
     commit_message_arg: str | None,
     logger=None,
 ) -> None:
-    service.handle_put(
-        PutCommand(
-            product_name=product_name,
-            branch_arg=branch_arg,
-            version_arg=version_arg,
-            keep_version=keep_version,
-            format_sql=format_sql,
-            excel_arg=excel_arg,
-            commit_message_arg=commit_message_arg,
-            logger=logger,
-        )
+    operations.run_put(
+        product_name=product_name,
+        branch=branch_arg,
+        version=version_arg,
+        keep_version=keep_version,
+        format_sql=format_sql,
+        excel_path=excel_arg,
+        commit_message=commit_message_arg,
+        logger=logger,
     )
 
 
@@ -79,7 +74,7 @@ def main() -> None:
 
     if args.command == "get":
         handle_get(
-            container.service,
+            container.operations,
             args.product_name,
             args.branch,
             args.version,
@@ -88,7 +83,7 @@ def main() -> None:
         )
     elif args.command == "put":
         handle_put(
-            container.service,
+            container.operations,
             args.product_name,
             args.branch,
             args.version,
