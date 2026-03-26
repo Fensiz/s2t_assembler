@@ -63,6 +63,7 @@ def format_hive_sql(sql: str) -> str:
     clause = ""
     line_indent = 0
     select_clause_depth = 0
+    active_select_depth: int | None = None
     predicate_clause_depth = 0
     last_token_upper = ""
     next_token_upper = ""
@@ -77,7 +78,8 @@ def format_hive_sql(sql: str) -> str:
 
     def render_indent(line: str) -> int:
         extra_indent = 0
-        if clause == "SELECT" and line != "SELECT":
+        in_window_line = bool(paren_types and paren_types[-1][0] == "window" and line.startswith(("PARTITION BY ", "ORDER BY ", ")")))
+        if active_select_depth is not None and line_indent >= active_select_depth and line != "SELECT" and not in_window_line:
             extra_indent += 1
         if line.startswith(("ON ", "AND ", "OR ")):
             extra_indent += 1
@@ -114,11 +116,12 @@ def format_hive_sql(sql: str) -> str:
             if current_parts and not current_parts[-1].endswith((" ", "(", ".")) and paren_type != "function":
                 current_parts.append(" ")
             current_parts.append("(")
-            paren_indent = (
-                line_indent
-                if paren_type == "subquery"
-                else render_indent("".join(current_parts).strip())
-            )
+            if paren_type == "subquery":
+                paren_indent = line_indent
+            elif paren_type == "window":
+                paren_indent = max(render_indent("".join(current_parts).strip()) - 1, 0)
+            else:
+                paren_indent = render_indent("".join(current_parts).strip())
             paren_types.append((paren_type, paren_indent))
             return
         if token == ")":
@@ -180,6 +183,9 @@ def format_hive_sql(sql: str) -> str:
             clause = upper
             if upper == "SELECT":
                 select_clause_depth = paren_depth
+                active_select_depth = paren_depth
+            if upper == "FROM" and active_select_depth == paren_depth:
+                active_select_depth = None
             if upper in {"WHERE", "HAVING", "ON"}:
                 predicate_clause_depth = paren_depth
             if upper in {"WITH", "SELECT"}:
@@ -204,7 +210,7 @@ def format_hive_sql(sql: str) -> str:
             last_token_upper = ""
             continue
 
-        if upper == "," and clause == "SELECT" and paren_depth == select_clause_depth and not current_parts and lines:
+        if upper == "," and active_select_depth == paren_depth and not current_parts and lines:
             previous = lines[-1]
             comment_pos = previous.find("--")
             if comment_pos >= 0:
@@ -216,7 +222,7 @@ def format_hive_sql(sql: str) -> str:
             last_token_upper = upper
             continue
 
-        if upper == "," and clause == "SELECT" and paren_depth == select_clause_depth:
+        if upper == "," and active_select_depth == paren_depth:
             add(token_out)
             flush_line()
             last_token_upper = upper
@@ -251,6 +257,8 @@ def format_hive_sql(sql: str) -> str:
             indent = max(indent - 1, 0)
             if paren_types:
                 paren_types.pop()
+            if active_select_depth is not None and active_select_depth > paren_depth:
+                active_select_depth = None
             if closed_paren_type in {"subquery", "subquery_expr"} and paren_depth == 0:
                 clause = "WITH"
 

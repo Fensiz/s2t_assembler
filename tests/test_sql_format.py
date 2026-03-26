@@ -173,6 +173,18 @@ class SqlFormatTests(unittest.TestCase):
         self.assertIn("\n        AND s IS NOT NULL", formatted)
         self.assertIn("\n        AND s <> '0'", formatted)
 
+    def test_format_hive_sql_formats_case_as_select_item(self) -> None:
+        sql = "SELECT CASE WHEN x = 1 THEN y ELSE z END, a, b, c FROM t"
+        formatted = format_hive_sql(sql)
+        self.assertIn("SELECT\n    CASE", formatted)
+        self.assertIn("\n        WHEN x = 1 THEN y", formatted)
+        self.assertIn("\n        ELSE z", formatted)
+        self.assertIn("\n    END,", formatted)
+        self.assertIn("\n    a,", formatted)
+        self.assertIn("\n    b,", formatted)
+        self.assertIn("\n    c", formatted)
+        self.assertIn("\nFROM t", formatted)
+
 
 if __name__ == "__main__":
     unittest.main()
