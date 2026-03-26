@@ -7,7 +7,7 @@ from openpyxl import load_workbook
 from openpyxl.workbook.workbook import Workbook
 from openpyxl.worksheet.worksheet import Worksheet
 
-from s2t_tool.adapters.excel.reader_sections import (
+from s2t_tool.adapters.excel.readers import (
     export_change_history as export_change_history_section,
     export_joins as export_joins_section,
     export_mappings as export_mappings_section,
