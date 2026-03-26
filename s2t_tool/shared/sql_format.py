@@ -41,7 +41,7 @@ MULTIWORD_KEYWORDS = [
 ]
 
 TOKEN_RE = re.compile(
-    r"/\*.*?\*/|--[^\n]*|'(?:''|[^'])*'|`[^`]*`|\d+(?:\.\d+)?|[A-Za-z_][A-Za-z0-9_$]*|[(),.:;]|<=|>=|<>|!=|==|[-+*/%<>=]|[^\s]",
+    r"/\*.*?\*/|--[^\n]*|\$\{[^}]+\}|'(?:''|[^'])*'|`[^`]*`|\d+(?:\.\d+)?|[A-Za-z_][A-Za-z0-9_$]*|[(),.:;]|<=|>=|<>|!=|==|[-+*/%<>=]|[^\s]",
     flags=re.DOTALL,
 )
 
@@ -65,6 +65,7 @@ def format_hive_sql(sql: str) -> str:
     select_clause_depth = 0
     active_select_depth: int | None = None
     predicate_clause_depth = 0
+    between_pending_depth: int | None = None
     last_token_upper = ""
     next_token_upper = ""
 
@@ -168,7 +169,18 @@ def format_hive_sql(sql: str) -> str:
             last_token_upper = upper
             continue
 
+        if upper == "BETWEEN":
+            add(token_out)
+            between_pending_depth = paren_depth
+            last_token_upper = upper
+            continue
+
         if upper in {"AND", "OR"}:
+            if upper == "AND" and between_pending_depth == paren_depth:
+                add(token_out)
+                between_pending_depth = None
+                last_token_upper = upper
+                continue
             if clause in {"WHERE", "HAVING", "ON"} and paren_depth == predicate_clause_depth:
                 flush_line()
                 add(token_out)

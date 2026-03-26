@@ -185,6 +185,18 @@ class SqlFormatTests(unittest.TestCase):
         self.assertIn("\n    c", formatted)
         self.assertIn("\nFROM t", formatted)
 
+    def test_format_hive_sql_preserves_hivevar_placeholder(self) -> None:
+        sql = "SELECT ${hivevar:F_FILTER} FROM t"
+        formatted = format_hive_sql(sql)
+        self.assertIn("${hivevar:F_FILTER}", formatted)
+        self.assertNotIn("$ { hivevar:F_FILTER }", formatted)
+
+    def test_format_hive_sql_keeps_between_bounds_on_same_line(self) -> None:
+        sql = "SELECT * FROM t WHERE x = 1 AND date BETWEEN a AND b AND y = 2"
+        formatted = format_hive_sql(sql)
+        self.assertIn("\n    AND date BETWEEN a AND b", formatted)
+        self.assertIn("\n    AND y = 2", formatted)
+
 
 if __name__ == "__main__":
     unittest.main()
