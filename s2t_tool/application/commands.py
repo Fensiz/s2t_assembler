@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 
 
 @dataclass
@@ -10,8 +9,7 @@ class GetCommand:
     branch_arg: str | None
     version_arg: str | None
     diff_commit_arg: str | None
-    config: dict[str, Any]
-    logger: Any = None
+    logger: object | None = None
 
 
 @dataclass
@@ -23,5 +21,4 @@ class PutCommand:
     format_sql: bool
     excel_arg: str | None
     commit_message_arg: str | None
-    config: dict[str, Any]
-    logger: Any = None
+    logger: object | None = None

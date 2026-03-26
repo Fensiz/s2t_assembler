@@ -2,15 +2,16 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Mapping, Any
 
+from s2t_tool.application.settings import AppConfig
 from s2t_tool.shared.resources import load_json_resource
 
 
 APP_CONFIG_FILE = "app_config.json"
 
 
-def load_app_config(config_path: str | Path | None = None) -> dict[str, Any]:
+def load_app_config(config_path: str | Path | None = None) -> AppConfig:
     """
     Load app config.
 
@@ -19,13 +20,19 @@ def load_app_config(config_path: str | Path | None = None) -> dict[str, Any]:
     2. bundled app_config.json resource
     """
     if config_path is None:
-        return load_json_resource(APP_CONFIG_FILE)
+        return AppConfig.from_mapping(load_json_resource(APP_CONFIG_FILE))
 
     path = Path(config_path)
     if path.exists():
-        return json.loads(path.read_text(encoding="utf-8"))
+        return AppConfig.from_mapping(json.loads(path.read_text(encoding="utf-8")))
 
-    return load_json_resource(str(config_path))
+    return AppConfig.from_mapping(load_json_resource(str(config_path)))
+
+
+def _coerce_config(config: AppConfig | Mapping[str, Any]) -> AppConfig:
+    if isinstance(config, AppConfig):
+        return config
+    return AppConfig.from_mapping(config)
 
 
 def expand_user_path(path: str) -> Path:
@@ -49,40 +56,43 @@ def build_local_repo_path(workspace_dir: str, product_name: str) -> Path:
     return expand_user_path(workspace_dir) / product_name
 
 
-def resolve_repo_url(config: dict[str, Any], product_name: str) -> str:
-    base_url = config["repo_base_url"]
-    return build_repo_url(base_url, product_name)
+def resolve_repo_url(config: AppConfig | Mapping[str, Any], product_name: str) -> str:
+    config = _coerce_config(config)
+    return build_repo_url(config.repo_base_url, product_name)
 
 
-def resolve_repo_dir(config: dict[str, Any], product_name: str) -> Path:
-    workspace_dir = config.get("workspace_dir", "~/.s2t")
-    return build_local_repo_path(workspace_dir, product_name)
+def resolve_repo_dir(config: AppConfig | Mapping[str, Any], product_name: str) -> Path:
+    config = _coerce_config(config)
+    return build_local_repo_path(config.workspace_dir, product_name)
 
 
-def resolve_repo_data_dir(config: dict[str, Any], repo_dir: Path) -> Path:
+def resolve_repo_data_dir(config: AppConfig | Mapping[str, Any], repo_dir: Path) -> Path:
     """
     Resolve directory inside repo where S2T data is stored.
     """
-    subdir = config.get("repo_data_subdir", ".")
+    config = _coerce_config(config)
+    subdir = config.repo_data_subdir
     if subdir in ("", "."):
         return repo_dir
     return repo_dir / subdir
 
 
-def resolve_excel_output_dir(config: dict[str, Any]) -> Path:
+def resolve_excel_output_dir(config: AppConfig | Mapping[str, Any]) -> Path:
     """
     Resolve directory where generated Excel files are written.
     """
-    path = expand_user_path(config.get("excel_output_dir", "."))
+    config = _coerce_config(config)
+    path = expand_user_path(config.excel_output_dir)
     path.mkdir(parents=True, exist_ok=True)
     return path
 
 
-def resolve_writer_config(config: dict[str, Any]) -> str:
+def resolve_writer_config(config: AppConfig | Mapping[str, Any]) -> str:
     """
     Resolve writer config file name/path.
     """
-    return config.get("writer_config", "writer_config.json")
+    config = _coerce_config(config)
+    return config.writer_config
 
 
 def ensure_excel_output_dir(path: Path) -> None:

@@ -1,0 +1,53 @@
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Protocol
+
+from s2t_tool.application.results import RecentItem
+from s2t_tool.application.settings import AppConfig
+
+
+class PathResolver(Protocol):
+    def repo_url(self, config: AppConfig, product_name: str) -> str: ...
+    def repo_dir(self, config: AppConfig, product_name: str) -> Path: ...
+    def repo_data_dir(self, config: AppConfig, repo_dir: Path) -> Path: ...
+    def excel_output_dir(self, config: AppConfig) -> Path: ...
+    def writer_config(self, config: AppConfig) -> str: ...
+
+
+class RepositoryGateway(Protocol):
+    def ensure_repo(self, repo_url: str, repo_dir: Path, branch: str, base_branch: str, logger=None) -> None: ...
+    def export_tree(self, repo_dir: Path, ref: str, target_dir: Path) -> None: ...
+    def replace_contents(self, path: Path, replacement_dir: Path, preserved_names: set[str] | None = None) -> None: ...
+    def has_changes_excluding(self, repo_dir: Path, excluded_paths: list[Path]) -> bool: ...
+    def commit_and_push(self, repo_dir: Path, branch: str, message: str, logger=None) -> None: ...
+
+
+class ExcelGateway(Protocol):
+    def build_excel(
+        self,
+        repo_dir: Path,
+        output_excel: Path,
+        writer_config: str,
+        diff_repo_dir: Path | None,
+        diff_ref: str | None,
+        logger=None,
+    ) -> None: ...
+
+    def export_excel_to_repo(
+        self,
+        excel_path: Path,
+        output_dir: Path,
+        format_sql: bool,
+        logger=None,
+    ) -> None: ...
+
+
+class ArtifactGateway(Protocol):
+    def find_latest_excel(self, excel_dir: Path, product_name: str, diff_mode: bool) -> Path | None: ...
+
+
+class RecentItemsGateway(Protocol):
+    def load(self) -> list[RecentItem]: ...
+    def save(self, items: list[RecentItem]) -> None: ...
+    def label(self, item: RecentItem) -> str: ...
