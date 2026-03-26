@@ -19,11 +19,9 @@ from s2t_tool.domain.versioning import (
     looks_like_version,
     read_repo_version,
 )
-from s2t_tool.adapters.facades import (
-    DefaultPathResolver,
-    GitRepositoryAdapter,
-    OpenpyxlExcelAdapter,
-)
+from s2t_tool.adapters.config.paths import DefaultPathResolver
+from s2t_tool.adapters.excel.gateway import OpenpyxlExcelAdapter
+from s2t_tool.adapters.git.gateway import GitRepositoryAdapter
 
 
 class GetS2TUseCase:

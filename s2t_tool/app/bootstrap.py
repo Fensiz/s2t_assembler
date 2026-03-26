@@ -8,14 +8,12 @@ from s2t_tool.app.recent import RecentItemsService
 from s2t_tool.app.update_flow import AppUpdateFlowService
 from s2t_tool.use_cases.service import S2TService
 from s2t_tool.use_cases.settings import AppConfig
-from s2t_tool.adapters.facades import (
-    DefaultPathResolver,
-    GitRepositoryAdapter,
-    OpenpyxlExcelAdapter,
-    RecentItemsAdapter,
-)
 from s2t_tool.adapters.config.loader import load_app_config
+from s2t_tool.adapters.config.paths import DefaultPathResolver
+from s2t_tool.adapters.excel.gateway import OpenpyxlExcelAdapter
+from s2t_tool.adapters.git.gateway import GitRepositoryAdapter
 from s2t_tool.adapters.system.initial_setup import InitialSetupService
+from s2t_tool.adapters.system.recent_gateway import RecentItemsAdapter
 from s2t_tool.adapters.system.update_service import UpdateService
 
 

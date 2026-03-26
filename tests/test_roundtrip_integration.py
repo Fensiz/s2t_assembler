@@ -5,7 +5,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from s2t_tool.adapters.facades import DefaultPathResolver, OpenpyxlExcelAdapter
+from s2t_tool.adapters.config.paths import DefaultPathResolver
+from s2t_tool.adapters.excel.gateway import OpenpyxlExcelAdapter
 from s2t_tool.adapters.git.repository import replace_directory_contents
 from s2t_tool.shared.csv_files import write_csv_rows
 from s2t_tool.shared.files import write_json_file, write_text_file

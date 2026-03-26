@@ -10,11 +10,9 @@ from s2t_tool.use_cases.settings import AppConfig
 from s2t_tool.domain.branching import is_commit_ref, resolve_branch
 from s2t_tool.domain.file_naming import ensure_put_compatible_excel, rename_excel_after_put, resolve_input_excel_path
 from s2t_tool.domain.versioning import VERSION_JSON, read_repo_version, resolve_put_version, write_repo_version
-from s2t_tool.adapters.facades import (
-    DefaultPathResolver,
-    GitRepositoryAdapter,
-    OpenpyxlExcelAdapter,
-)
+from s2t_tool.adapters.config.paths import DefaultPathResolver
+from s2t_tool.adapters.excel.gateway import OpenpyxlExcelAdapter
+from s2t_tool.adapters.git.gateway import GitRepositoryAdapter
 
 
 class PutS2TUseCase:
