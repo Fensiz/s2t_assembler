@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import tkinter as tk
 from pathlib import Path
-
-from s2t_tool.use_cases.results import RecentItem
 from s2t_tool.app.bootstrap import AppContainer
 from s2t_tool.domain.branching import is_commit_ref
 from s2t_tool.adapters.system.os_runtime import (
@@ -82,30 +80,22 @@ class S2TController:
         run_in_thread(wrapped)
 
     def _fill_recent_items(self) -> None:
-        items = self.container.recent_items.load()
-        self.view.fill_recent_items(items, self.container.recent_items.label)
+        recent = self.container.recent.build_view_data()
+        self.view.fill_recent_items(recent.items, lambda item: f"{item.product_name} [{item.branch}]" if item.branch else item.product_name)
 
     def _update_recent_items(self, product_name: str, branch: str) -> None:
-        items = self.container.recent_items.load()
-        filtered = [
-            item
-            for item in items
-            if not (item.product_name == product_name and item.branch == branch)
-        ]
-        filtered.insert(0, RecentItem(product_name=product_name, branch=branch))
-        self.container.recent_items.save(filtered)
-        self.view.fill_recent_items(filtered, self.container.recent_items.label)
+        recent = self.container.recent.add_recent(product_name, branch)
+        self.view.fill_recent_items(recent.items, lambda item: f"{item.product_name} [{item.branch}]" if item.branch else item.product_name)
 
     def _on_recent_select(self, event) -> None:
         assert self.view.recent_listbox is not None
         selection = self.view.recent_listbox.curselection()
         if not selection:
             return
-        items = self.container.recent_items.load()
         index = selection[0]
-        if index >= len(items):
+        item = self.container.recent.get_by_index(index)
+        if item is None:
             return
-        item = items[index]
         self.view.fill_form_from_recent_item(
             {"product_name": item.product_name, "branch": item.branch}
         )
