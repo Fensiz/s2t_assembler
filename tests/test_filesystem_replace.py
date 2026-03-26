@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from s2t_tool.infrastructure.git_repo import replace_directory_contents
+from s2t_tool.adapters.git.repository import replace_directory_contents
 
 
 class ReplaceDirectoryContentsTests(unittest.TestCase):
@@ -68,7 +68,7 @@ class ReplaceDirectoryContentsTests(unittest.TestCase):
                     raise OSError("simulated failure")
                 return original_replace(src, dst)
 
-            with patch("s2t_tool.infrastructure.git_repo.os.replace", side_effect=failing_replace):
+            with patch("s2t_tool.adapters.git.repository.os.replace", side_effect=failing_replace):
                 with self.assertRaises(OSError):
                     replace_directory_contents(target, replacement)
 

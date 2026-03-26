@@ -7,7 +7,7 @@ from pathlib import Path
 from openpyxl import Workbook
 
 from s2t_tool.domain.schema import DEFAULT_SCHEMA
-from s2t_tool.infrastructure.excel_reader import ExcelRepoReader
+from s2t_tool.adapters.excel.reader import ExcelRepoReader
 
 
 class ReaderSchemaTests(unittest.TestCase):

@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import tkinter as tk
 
-from s2t_tool.bootstrap import build_container
-from s2t_tool.presentation.controller import S2TController
-from s2t_tool.presentation.i18n import detect_language
-from s2t_tool.presentation.view import S2TView
+from s2t_tool.app.bootstrap import build_container
+from s2t_tool.adapters.ui.controller import S2TController
+from s2t_tool.adapters.ui.i18n import detect_language
+from s2t_tool.adapters.ui.view import S2TView
 
 
 class S2TDesktopApp:

@@ -6,8 +6,8 @@ from tkinter import messagebox
 from typing import Any, Callable
 
 from s2t_tool.app_info import APP_VERSION
-from s2t_tool.presentation.form_models import GetRequest, PutRequest
-from s2t_tool.presentation.i18n import detect_language, tr
+from s2t_tool.adapters.ui.form_models import GetRequest, PutRequest
+from s2t_tool.adapters.ui.i18n import detect_language, tr
 
 
 class S2TView:

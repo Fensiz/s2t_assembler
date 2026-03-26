@@ -6,7 +6,7 @@ from pathlib import Path
 
 from openpyxl import Workbook
 
-from s2t_tool.infrastructure.excel_reader import ExcelRepoReader
+from s2t_tool.adapters.excel.reader import ExcelRepoReader
 from s2t_tool.shared.sql_format import format_hive_sql
 
 

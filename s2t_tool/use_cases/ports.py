@@ -3,8 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Protocol
 
-from s2t_tool.application.results import RecentItem
-from s2t_tool.application.settings import AppConfig
+from s2t_tool.use_cases.results import RecentItem
+from s2t_tool.use_cases.settings import AppConfig
 
 
 class PathResolver(Protocol):

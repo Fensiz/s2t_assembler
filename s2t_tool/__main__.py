@@ -1,4 +1,4 @@
-from s2t_tool.presentation.app import main_ui
+from s2t_tool.adapters.ui.app import main_ui
 
 
 if __name__ == "__main__":

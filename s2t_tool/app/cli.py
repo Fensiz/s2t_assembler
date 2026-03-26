@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import argparse
 
-from s2t_tool.application.commands import GetCommand, PutCommand
-from s2t_tool.bootstrap import build_container
+from s2t_tool.use_cases.commands import GetCommand, PutCommand
+from s2t_tool.app.bootstrap import build_container
 
 
 def handle_get(

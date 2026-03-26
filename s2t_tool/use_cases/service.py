@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from s2t_tool.application.commands import GetCommand, PutCommand
-from s2t_tool.application.results import GetResult, PutResult
-from s2t_tool.application.settings import AppConfig
-from s2t_tool.application.use_cases.get_s2t import GetS2TUseCase
-from s2t_tool.application.use_cases.put_s2t import PutS2TUseCase
+from s2t_tool.use_cases.commands import GetCommand, PutCommand
+from s2t_tool.use_cases.results import GetResult, PutResult
+from s2t_tool.use_cases.settings import AppConfig
+from s2t_tool.use_cases.get_s2t import GetS2TUseCase
+from s2t_tool.use_cases.put_s2t import PutS2TUseCase
 
 
 class S2TService:

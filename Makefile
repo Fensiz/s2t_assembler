@@ -40,7 +40,7 @@ prepare:
 pyz: prepare $(DIST_DIR)
 	$(PYTHON) -m zipapp $(STAGING_DIR) \
 		-o $(PYZ_FILE) \
-		-m "s2t_tool.presentation.app:main_ui"
+		-m "s2t_tool.adapters.ui.app:main_ui"
 
 deploy: pyz
 	mkdir -p $(RELEASES_DIR)

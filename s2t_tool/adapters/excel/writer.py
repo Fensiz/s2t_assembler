@@ -11,7 +11,7 @@ from openpyxl.cell.text import InlineFont
 from openpyxl.worksheet.worksheet import Worksheet
 
 from s2t_tool.domain.schema import DEFAULT_SCHEMA, S2TSchema
-from s2t_tool.infrastructure.writer_style import (
+from s2t_tool.adapters.excel.writer_style import (
     WRITER_CONFIG_FILE,
     apply_table_borders,
     append_csv_sheet,
@@ -19,7 +19,7 @@ from s2t_tool.infrastructure.writer_style import (
     finalize_sheet_style,
     load_writer_config,
 )
-from s2t_tool.infrastructure.writer_sections import (
+from s2t_tool.adapters.excel.writer_sections import (
     build_joins_sheet as build_joins_sheet_section,
     build_mappings_sheet as build_mappings_sheet_section,
     build_metadata_sheet as build_metadata_sheet_section,

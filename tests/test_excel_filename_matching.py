@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 from s2t_tool.domain.file_naming import resolve_input_excel_path
-from s2t_tool.infrastructure.excel_artifacts import find_latest_excel_file
+from s2t_tool.adapters.excel.artifacts import find_latest_excel_file
 
 
 class ExcelFilenameMatchingTests(unittest.TestCase):

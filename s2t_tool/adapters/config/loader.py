@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from typing import Mapping, Any
 
-from s2t_tool.application.settings import AppConfig
+from s2t_tool.use_cases.settings import AppConfig
 from s2t_tool.shared.resources import load_json_resource
 
 

@@ -5,9 +5,9 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock
 
-from s2t_tool.application.commands import GetCommand, PutCommand
-from s2t_tool.application.service import S2TService
-from s2t_tool.application.settings import AppConfig
+from s2t_tool.use_cases.commands import GetCommand, PutCommand
+from s2t_tool.use_cases.service import S2TService
+from s2t_tool.use_cases.settings import AppConfig
 
 
 class ServiceCommitRefTests(unittest.TestCase):

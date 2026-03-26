@@ -2,17 +2,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from s2t_tool.application.service import S2TService
-from s2t_tool.application.settings import AppConfig
-from s2t_tool.infrastructure.adapters import (
+from s2t_tool.use_cases.service import S2TService
+from s2t_tool.use_cases.settings import AppConfig
+from s2t_tool.adapters.facades import (
     DefaultPathResolver,
     ExcelArtifactAdapter,
     GitRepositoryAdapter,
     OpenpyxlExcelAdapter,
     RecentItemsAdapter,
 )
-from s2t_tool.infrastructure.config import load_app_config
-from s2t_tool.infrastructure.update_service import UpdateService
+from s2t_tool.adapters.config.loader import load_app_config
+from s2t_tool.adapters.system.update_service import UpdateService
 
 
 @dataclass(frozen=True)

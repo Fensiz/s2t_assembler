@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from s2t_tool.presentation.i18n import localize_runtime_message
+from s2t_tool.adapters.ui.i18n import localize_runtime_message
 
 
 class RuntimeMessageLocalizationTests(unittest.TestCase):

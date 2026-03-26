@@ -99,7 +99,7 @@ def resolve_input_excel_path(
     """
     Resolve Excel file to use for PUT.
     """
-    from s2t_tool.infrastructure.config import resolve_excel_output_dir
+    from s2t_tool.adapters.config.loader import resolve_excel_output_dir
 
     if explicit_excel:
         return Path(explicit_excel).expanduser().resolve()

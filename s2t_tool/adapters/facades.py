@@ -2,33 +2,33 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from s2t_tool.application.ports import (
+from s2t_tool.use_cases.ports import (
     ArtifactGateway,
     ExcelGateway,
     PathResolver,
     RecentItemsGateway,
     RepositoryGateway,
 )
-from s2t_tool.application.results import RecentItem
-from s2t_tool.application.settings import AppConfig
-from s2t_tool.infrastructure.config import (
+from s2t_tool.use_cases.results import RecentItem
+from s2t_tool.use_cases.settings import AppConfig
+from s2t_tool.adapters.config.loader import (
     resolve_excel_output_dir,
     resolve_repo_data_dir,
     resolve_repo_dir,
     resolve_repo_url,
     resolve_writer_config,
 )
-from s2t_tool.infrastructure.excel_artifacts import find_latest_excel_file
-from s2t_tool.infrastructure.excel_reader import export_excel_to_repo
-from s2t_tool.infrastructure.excel_writer import build_excel_from_repo
-from s2t_tool.infrastructure.git_repo import (
+from s2t_tool.adapters.excel.artifacts import find_latest_excel_file
+from s2t_tool.adapters.excel.reader import export_excel_to_repo
+from s2t_tool.adapters.excel.writer import build_excel_from_repo
+from s2t_tool.adapters.git.repository import (
     commit_and_push,
     ensure_repo,
     export_commit_tree,
     has_changes_excluding,
     replace_directory_contents,
 )
-from s2t_tool.infrastructure.recent_store import RecentItemsStore
+from s2t_tool.adapters.system.recent_store import RecentItemsStore
 
 
 class DefaultPathResolver(PathResolver):

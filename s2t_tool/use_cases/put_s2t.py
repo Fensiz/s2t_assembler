@@ -3,14 +3,14 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-from s2t_tool.application.commands import PutCommand
-from s2t_tool.application.ports import ExcelGateway, PathResolver, RepositoryGateway
-from s2t_tool.application.results import PutResult
-from s2t_tool.application.settings import AppConfig
+from s2t_tool.use_cases.commands import PutCommand
+from s2t_tool.use_cases.ports import ExcelGateway, PathResolver, RepositoryGateway
+from s2t_tool.use_cases.results import PutResult
+from s2t_tool.use_cases.settings import AppConfig
 from s2t_tool.domain.branching import is_commit_ref, resolve_branch
 from s2t_tool.domain.file_naming import ensure_put_compatible_excel, rename_excel_after_put, resolve_input_excel_path
 from s2t_tool.domain.versioning import VERSION_JSON, read_repo_version, resolve_put_version, write_repo_version
-from s2t_tool.infrastructure.adapters import (
+from s2t_tool.adapters.facades import (
     DefaultPathResolver,
     GitRepositoryAdapter,
     OpenpyxlExcelAdapter,

@@ -6,19 +6,19 @@ import sys
 import tkinter as tk
 from pathlib import Path
 
-from s2t_tool.application.commands import GetCommand, PutCommand
-from s2t_tool.application.results import RecentItem
-from s2t_tool.bootstrap import AppContainer
+from s2t_tool.use_cases.commands import GetCommand, PutCommand
+from s2t_tool.use_cases.results import RecentItem
+from s2t_tool.app.bootstrap import AppContainer
 from s2t_tool.domain.branching import is_commit_ref
-from s2t_tool.infrastructure.initial_setup import InitialSetupService
-from s2t_tool.infrastructure.os_runtime import (
+from s2t_tool.adapters.system.initial_setup import InitialSetupService
+from s2t_tool.adapters.system.os_runtime import (
     open_directory_in_os,
     open_file_in_os,
     run_in_thread,
 )
-from s2t_tool.presentation.form_models import GetRequest, PutRequest
-from s2t_tool.presentation.i18n import detect_language, localize_runtime_message, tr
-from s2t_tool.presentation.view import S2TView
+from s2t_tool.adapters.ui.form_models import GetRequest, PutRequest
+from s2t_tool.adapters.ui.i18n import detect_language, localize_runtime_message, tr
+from s2t_tool.adapters.ui.view import S2TView
 
 
 class S2TController:

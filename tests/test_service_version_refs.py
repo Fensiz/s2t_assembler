@@ -6,10 +6,10 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from s2t_tool.application.commands import GetCommand, PutCommand
-from s2t_tool.application.service import S2TService
-from s2t_tool.application.settings import AppConfig
-from s2t_tool.infrastructure.git_repo import replace_directory_contents
+from s2t_tool.use_cases.commands import GetCommand, PutCommand
+from s2t_tool.use_cases.service import S2TService
+from s2t_tool.use_cases.settings import AppConfig
+from s2t_tool.adapters.git.repository import replace_directory_contents
 
 
 class ServiceVersionRefTests(unittest.TestCase):
@@ -179,9 +179,9 @@ class ServiceVersionRefTests(unittest.TestCase):
                 logger=None,
             )
 
-            with patch("s2t_tool.application.use_cases.put_s2t.ensure_put_compatible_excel"), \
-                patch("s2t_tool.application.use_cases.put_s2t.rename_excel_after_put"), \
-                patch("s2t_tool.application.use_cases.put_s2t.write_repo_version") as write_repo_version_mock:
+            with patch("s2t_tool.use_cases.put_s2t.ensure_put_compatible_excel"), \
+                patch("s2t_tool.use_cases.put_s2t.rename_excel_after_put"), \
+                patch("s2t_tool.use_cases.put_s2t.write_repo_version") as write_repo_version_mock:
                 service.handle_put(command)
 
             write_repo_version_mock.assert_called_once_with(version_path, "1.2.3")
@@ -238,8 +238,8 @@ class ServiceVersionRefTests(unittest.TestCase):
                 logger=None,
             )
 
-            with patch("s2t_tool.application.use_cases.put_s2t.ensure_put_compatible_excel"), \
-                patch("s2t_tool.application.use_cases.put_s2t.rename_excel_after_put"):
+            with patch("s2t_tool.use_cases.put_s2t.ensure_put_compatible_excel"), \
+                patch("s2t_tool.use_cases.put_s2t.rename_excel_after_put"):
                 service.handle_put(command)
 
             restored_version = json.loads(version_path.read_text(encoding="utf-8"))["version"]

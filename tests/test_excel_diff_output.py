@@ -8,8 +8,8 @@ from pathlib import Path
 from openpyxl import Workbook
 from openpyxl.cell.rich_text import CellRichText, TextBlock
 
-from s2t_tool.infrastructure.excel_writer import build_rich_diff, maybe_build_rich_diff
-from s2t_tool.infrastructure.writer_style import append_csv_sheet, finalize_sheet_style
+from s2t_tool.adapters.excel.writer import build_rich_diff, maybe_build_rich_diff
+from s2t_tool.adapters.excel.writer_style import append_csv_sheet, finalize_sheet_style
 from s2t_tool.shared.csv_files import write_csv_rows
 
 

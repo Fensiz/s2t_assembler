@@ -3,10 +3,10 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-from s2t_tool.application.commands import GetCommand
-from s2t_tool.application.ports import ExcelGateway, PathResolver, RepositoryGateway
-from s2t_tool.application.results import GetResult
-from s2t_tool.application.settings import AppConfig
+from s2t_tool.use_cases.commands import GetCommand
+from s2t_tool.use_cases.ports import ExcelGateway, PathResolver, RepositoryGateway
+from s2t_tool.use_cases.results import GetResult
+from s2t_tool.use_cases.settings import AppConfig
 from s2t_tool.domain.branching import is_commit_ref, is_debug_branch, resolve_branch
 from s2t_tool.domain.file_naming import (
     build_branch_diff_excel_filename,
@@ -19,7 +19,7 @@ from s2t_tool.domain.versioning import (
     looks_like_version,
     read_repo_version,
 )
-from s2t_tool.infrastructure.adapters import (
+from s2t_tool.adapters.facades import (
     DefaultPathResolver,
     GitRepositoryAdapter,
     OpenpyxlExcelAdapter,
