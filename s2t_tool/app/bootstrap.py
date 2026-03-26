@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from s2t_tool.app.lifecycle import AppLifecycleService
 from s2t_tool.app.operations import AppOperationsService
+from s2t_tool.app.update_flow import AppUpdateFlowService
 from s2t_tool.use_cases.service import S2TService
 from s2t_tool.use_cases.settings import AppConfig
 from s2t_tool.adapters.facades import (
@@ -22,6 +23,7 @@ class AppContainer:
     config: AppConfig
     service: S2TService
     operations: AppOperationsService
+    update_flow: AppUpdateFlowService
     paths: DefaultPathResolver
     recent_items: RecentItemsAdapter
     lifecycle: AppLifecycleService
@@ -43,10 +45,12 @@ def build_container(config_path: str | None = None, logger=None) -> AppContainer
         initial_setup_service=initial_setup_service,
         update_service=update_service,
     )
+    update_flow = AppUpdateFlowService(lifecycle)
     return AppContainer(
         config=config,
         service=service,
         operations=operations,
+        update_flow=update_flow,
         paths=paths,
         recent_items=recent_items,
         lifecycle=lifecycle,

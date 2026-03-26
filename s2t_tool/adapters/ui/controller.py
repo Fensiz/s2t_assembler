@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import shutil
-import subprocess
-import sys
 import tkinter as tk
 from pathlib import Path
 
@@ -210,8 +207,7 @@ class S2TController:
     def _check_updates_on_start(self) -> None:
         def worker() -> None:
             try:
-                self.container.lifecycle.update_service.logger = self._ui_logger
-                result = self.container.lifecycle.check_updates()
+                result = self.container.update_flow.check_updates(logger=self._ui_logger)
                 self._call_in_ui(lambda: self.view.set_update_available(result.available, result.latest_version))
                 if result.available and result.latest_version:
                     self._append_status_ui(self._t("update_available_status", version=result.latest_version))
@@ -223,8 +219,7 @@ class S2TController:
     def _on_version_click(self, event) -> None:
         def worker() -> None:
             try:
-                self.container.lifecycle.update_service.logger = self._ui_logger
-                result = self.container.lifecycle.check_updates()
+                result = self.container.update_flow.check_updates(logger=self._ui_logger)
                 self._call_in_ui(lambda: self.view.set_update_available(result.available, result.latest_version))
                 if not result.available:
                     self._call_in_ui(
@@ -259,15 +254,8 @@ class S2TController:
 
     def _restart_with_updated_app(self, app_path: Path) -> None:
         try:
-            python_executable = sys.executable or (
-                shutil.which("pythonw")
-                or shutil.which("python3")
-                or shutil.which("python")
-                or "python3"
-            )
-            command = [python_executable, str(app_path)]
+            command = self.container.update_flow.restart_updated_app(app_path, logger=None)
             self.view.append_status(self._t("starting_new_version", command=" ".join(command)))
-            subprocess.Popen(command, start_new_session=True, close_fds=True)
             self.view.append_status(self._t("new_version_started"))
             self.root.after(200, self.root.destroy)
         except Exception as exc:
@@ -280,8 +268,7 @@ class S2TController:
 
     def _perform_update(self) -> None:
         try:
-            self.container.lifecycle.update_service.logger = self._ui_logger
-            updated_app_path = self.container.lifecycle.install_update()
+            updated_app_path = self.container.update_flow.install_update(logger=self._ui_logger)
             self._append_status_ui(self._t("update_installed_restart"))
             self._call_in_ui(lambda path=updated_app_path: self._restart_with_updated_app(path))
         except Exception as exc:
