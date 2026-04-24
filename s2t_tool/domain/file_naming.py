@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 
 from s2t_tool.domain.branching import is_debug_branch
+from s2t_tool.shared.constants import Logger
 
 
 def build_branch_excel_filename(product_name: str, version: str, debug_mode: bool) -> str:
@@ -89,6 +90,11 @@ def find_excel_candidates(excel_dir: Path, patterns: list[str]) -> list[Path]:
     return candidates
 
 
+def is_debug_excel_filename(path: Path) -> bool:
+    lower_name = path.name.lower()
+    return lower_name.endswith("_debug.xlsx") or lower_name.endswith("_debug_diff.xlsx")
+
+
 def resolve_input_excel_path(
     config: dict,
     product_name: str,
@@ -124,7 +130,9 @@ def resolve_input_excel_path(
     candidates = sorted(
         [
             p for p in find_excel_candidates(excel_dir, [pattern])
-            if not p.name.lower().endswith("_diff.xlsx") and "_commit_" not in p.name.lower()
+            if not p.name.lower().endswith("_diff.xlsx")
+            and "_commit_" not in p.name.lower()
+            and is_debug_excel_filename(p) == debug_mode
         ],
         key=lambda p: p.stat().st_mtime,
         reverse=True,
@@ -145,7 +153,7 @@ def rename_excel_after_put(
     new_version: str,
     branch: str,
     default_branch: str,
-    logger=None,
+    logger: Logger | None = None,
 ) -> None:
     """
     Rename Excel file after successful PUT if version changed.

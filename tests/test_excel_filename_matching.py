@@ -37,6 +37,33 @@ class ExcelFilenameMatchingTests(unittest.TestCase):
 
             self.assertEqual(latest, second)
 
+    def test_resolve_input_excel_path_does_not_mix_master_and_debug_exports(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            excel_dir = Path(temp_dir)
+            master_excel = excel_dir / "S2T_USL_DEMO_v2.0.xlsx"
+            debug_excel = excel_dir / "S2T_USL_DEMO_v2.0_debug.xlsx"
+
+            master_excel.write_text("master", encoding="utf-8")
+            debug_excel.write_text("debug", encoding="utf-8")
+
+            resolved_master = resolve_input_excel_path(
+                config={"excel_output_dir": str(excel_dir), "default_branch": "s2t/master"},
+                product_name="demo",
+                explicit_excel=None,
+                explicit_version=None,
+                branch="s2t/master",
+            )
+            resolved_debug = resolve_input_excel_path(
+                config={"excel_output_dir": str(excel_dir), "default_branch": "s2t/master"},
+                product_name="demo",
+                explicit_excel=None,
+                explicit_version=None,
+                branch="s2t/debug/master",
+            )
+
+            self.assertEqual(resolved_master.resolve(), master_excel.resolve())
+            self.assertEqual(resolved_debug.resolve(), debug_excel.resolve())
+
 
 if __name__ == "__main__":
     unittest.main()
