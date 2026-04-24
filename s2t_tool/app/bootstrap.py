@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from s2t_tool.shared.constants import Logger
 from s2t_tool.app.lifecycle import AppLifecycleService
 from s2t_tool.app.operations import AppOperationsService
 from s2t_tool.app.recent import RecentItemsService
@@ -29,7 +30,7 @@ class AppContainer:
     lifecycle: AppLifecycleService
 
 
-def build_container(config_path: str | None = None, logger=None) -> AppContainer:
+def build_container(config_path: str | None = None, logger: Logger | None = None) -> AppContainer:
     config = load_app_config(config_path)
     paths = DefaultPathResolver()
     service = S2TService(

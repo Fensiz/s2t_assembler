@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from s2t_tool.adapters.system.dependency_manager import ensure_dependencies
+from s2t_tool.shared.constants import Logger
 
 
 @dataclass
@@ -19,7 +20,7 @@ class SetupState:
 
 
 class InitialSetupService:
-    def __init__(self, app_config: dict[str, Any], logger=None) -> None:
+    def __init__(self, app_config: dict[str, Any], logger: Logger | None = None) -> None:
         self.app_config = app_config
         self.logger = logger
 

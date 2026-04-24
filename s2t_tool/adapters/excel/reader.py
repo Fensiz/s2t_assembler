@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, overload
+
+from s2t_tool.shared.constants import Logger
 
 from openpyxl import load_workbook
 from openpyxl.workbook.workbook import Workbook
@@ -26,7 +28,7 @@ class ExcelRepoReader:
         output_dir: str | Path,
         schema: S2TSchema = DEFAULT_SCHEMA,
         format_sql: bool = False,
-        logger=None,
+        logger: Logger | None = None,
     ) -> None:
         self.excel_path = Path(excel_path)
         self.output_dir = Path(output_dir)
@@ -34,6 +36,13 @@ class ExcelRepoReader:
         self.format_sql = format_sql
         self.logger = logger
         self.workbook: Workbook = load_workbook(self.excel_path, data_only=True)
+
+    @overload
+    def get_sheet(self, sheet_name: str, required: Literal[True]) -> Worksheet: ...
+    @overload
+    def get_sheet(self, sheet_name: str, required: Literal[False]) -> Worksheet | None: ...
+    @overload
+    def get_sheet(self, sheet_name: str) -> Worksheet: ...
 
     def get_sheet(self, sheet_name: str, required: bool = True) -> Worksheet | None:
         normalized_aliases = {
@@ -55,17 +64,14 @@ class ExcelRepoReader:
 
     def export_change_history(self) -> Path:
         sheet = self.get_sheet(self.schema.change_history_sheet, required=True)
-        assert sheet is not None
         return export_change_history_section(self.output_dir, self.schema, sheet)
 
     def export_source_lg(self) -> Path:
         sheet = self.get_sheet(self.schema.source_lg_sheet, required=True)
-        assert sheet is not None
         return export_source_lg_section(self.output_dir, self.schema, sheet)
 
     def export_targets(self) -> Path:
         sheet = self.get_sheet(self.schema.targets_sheet, required=True)
-        assert sheet is not None
         return export_targets_section(self.output_dir, self.schema, sheet)
 
     def export_simple_csv_sheet(
@@ -80,17 +86,14 @@ class ExcelRepoReader:
 
     def export_pre_transforms(self) -> Path:
         sheet = self.get_sheet(self.schema.pre_transforms_sheet, required=True)
-        assert sheet is not None
         return export_pre_transforms_section(self.output_dir, self.schema, sheet, self.format_sql)
 
     def export_joins(self) -> Path:
         sheet = self.get_sheet(self.schema.joins_sheet, required=True)
-        assert sheet is not None
         return export_joins_section(self.output_dir, self.schema, sheet, self.format_sql)
 
     def export_mappings(self) -> tuple[Path, Path]:
         sheet = self.get_sheet(self.schema.mappings_sheet, required=True)
-        assert sheet is not None
         return export_mappings_section(self.output_dir, self.schema, sheet)
 
     def export_all(self) -> None:
@@ -205,7 +208,7 @@ def section_key_from_title(title: str) -> str:
     )
 
 
-def export_excel_to_repo(excel_path: str, output_dir: str, format_sql: bool = False, logger=None) -> None:
+def export_excel_to_repo(excel_path: str, output_dir: str, format_sql: bool = False, logger: Logger | None = None) -> None:
     ExcelRepoReader(
         excel_path=excel_path,
         output_dir=output_dir,

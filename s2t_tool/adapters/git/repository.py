@@ -9,12 +9,14 @@ import uuid
 from io import BytesIO
 from pathlib import Path
 
+from s2t_tool.shared.constants import Logger
+
 
 # ============================================================
 # Low-level git helpers
 # ============================================================
 
-def run_git(args: list[str], cwd: Path | None = None, log=None) -> str:
+def run_git(args: list[str], cwd: Path | None = None, log: Logger | None = None) -> str:
     """
     Execute git command and return collected output.
 
@@ -35,7 +37,8 @@ def run_git(args: list[str], cwd: Path | None = None, log=None) -> str:
 
     output_lines: list[str] = []
 
-    assert process.stdout is not None
+    if process.stdout is None:
+        raise RuntimeError(f"Failed to open stdout pipe for: {' '.join(cmd)}")
 
     for line in process.stdout:
         line = line.rstrip()
@@ -120,6 +123,14 @@ def clear_directory_contents(path: Path) -> None:
             child.unlink()
 
 
+def _cleanup_orphaned_backups(parent_dir: Path, name: str) -> None:
+    """Remove leftover backup directories from a previous interrupted replace_directory_contents call."""
+    prefix = f".{name}.backup-"
+    for child in parent_dir.iterdir():
+        if child.is_dir() and child.name.startswith(prefix):
+            shutil.rmtree(child, ignore_errors=True)
+
+
 def replace_directory_contents(
     path: Path,
     replacement_dir: Path,
@@ -132,6 +143,7 @@ def replace_directory_contents(
     If replacement fails, restore the original contents.
     """
     path.mkdir(parents=True, exist_ok=True)
+    _cleanup_orphaned_backups(path.parent, path.name)
 
     if not replacement_dir.exists() or not replacement_dir.is_dir():
         raise ValueError(f"Replacement directory does not exist: {replacement_dir}")
@@ -193,7 +205,7 @@ def clear_worktree_except_git(repo_dir: Path) -> None:
 # Sync helpers
 # ============================================================
 
-def reset_and_clean_to_remote(repo_dir: Path, branch: str, logger=None) -> None:
+def reset_and_clean_to_remote(repo_dir: Path, branch: str, logger: Logger | None = None) -> None:
     """
     Reset local working tree to exact remote branch state and remove untracked files.
     """
@@ -205,7 +217,7 @@ def reset_and_clean_to_remote(repo_dir: Path, branch: str, logger=None) -> None:
 # Branch creation / switching logic
 # ============================================================
 
-def create_orphan_branch(repo_dir: Path, branch: str, logger=None) -> None:
+def create_orphan_branch(repo_dir: Path, branch: str, logger: Logger | None = None) -> None:
     """
     Recreate branch as orphan.
 
@@ -234,7 +246,7 @@ def create_orphan_branch(repo_dir: Path, branch: str, logger=None) -> None:
     clear_worktree_except_git(repo_dir)
 
 
-def create_branch_from_base(repo_dir: Path, branch: str, base_branch: str, logger=None) -> None:
+def create_branch_from_base(repo_dir: Path, branch: str, base_branch: str, logger: Logger | None = None) -> None:
     """
     Create a new local branch from base_branch.
 
@@ -269,7 +281,7 @@ def create_branch_from_base(repo_dir: Path, branch: str, base_branch: str, logge
 # Clone / sync logic
 # ============================================================
 
-def clone_repo(repo_url: str, target_dir: Path, branch: str, base_branch: str, logger=None) -> None:
+def clone_repo(repo_url: str, target_dir: Path, branch: str, base_branch: str, logger: Logger | None = None) -> None:
     """
     Clone repository into target_dir and prepare requested branch.
 
@@ -302,7 +314,7 @@ def clone_repo(repo_url: str, target_dir: Path, branch: str, base_branch: str, l
     create_branch_from_base(target_dir, branch, base_branch, logger)
 
 
-def hard_reset_to_remote(repo_dir: Path, branch: str, base_branch: str, logger=None) -> None:
+def hard_reset_to_remote(repo_dir: Path, branch: str, base_branch: str, logger: Logger | None = None) -> None:
     """
     Bring already cloned repo to clean state.
 
@@ -332,7 +344,7 @@ def hard_reset_to_remote(repo_dir: Path, branch: str, base_branch: str, logger=N
     create_branch_from_base(repo_dir, branch, base_branch, logger)
 
 
-def ensure_repo(repo_url: str, repo_dir: Path, branch: str, base_branch: str, logger=None) -> None:
+def ensure_repo(repo_url: str, repo_dir: Path, branch: str, base_branch: str, logger: Logger | None = None) -> None:
     """
     Ensure local repo exists and is prepared on requested branch.
     """
@@ -413,7 +425,7 @@ def has_changes_excluding(repo_dir: Path, excluded_paths: list[Path] | None = No
     return False
 
 
-def commit_all(repo_dir: Path, message: str, logger=None) -> None:
+def commit_all(repo_dir: Path, message: str, logger: Logger | None = None) -> None:
     """
     Stage all changes (including deletions) and create commit.
     """
@@ -421,14 +433,14 @@ def commit_all(repo_dir: Path, message: str, logger=None) -> None:
     run_git(["commit", "-m", message], cwd=repo_dir, log=logger)
 
 
-def push(repo_dir: Path, branch: str, logger=None) -> None:
+def push(repo_dir: Path, branch: str, logger: Logger | None = None) -> None:
     """
     Push current branch to origin and set upstream if needed.
     """
     run_git(["push", "-u", "origin", branch], cwd=repo_dir, log=logger)
 
 
-def commit_and_push(repo_dir: Path, branch: str, message: str, logger=None) -> None:
+def commit_and_push(repo_dir: Path, branch: str, message: str, logger: Logger | None = None) -> None:
     """
     Commit and push repo only if there are changes.
     """

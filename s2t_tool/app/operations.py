@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from s2t_tool.shared.constants import Logger
 from s2t_tool.use_cases.commands import GetCommand, PutCommand
 from s2t_tool.use_cases.results import GetResult, PutResult
 from s2t_tool.use_cases.service import S2TService
@@ -16,7 +17,7 @@ class AppOperationsService:
         branch: str | None,
         version: str | None,
         diff_commit: str | None,
-        logger=None,
+        logger: Logger | None = None,
     ) -> GetResult:
         return self.service.handle_get(
             GetCommand(
@@ -38,7 +39,7 @@ class AppOperationsService:
         format_sql: bool,
         excel_path: str | None,
         commit_message: str | None,
-        logger=None,
+        logger: Logger | None = None,
     ) -> PutResult:
         return self.service.handle_put(
             PutCommand(

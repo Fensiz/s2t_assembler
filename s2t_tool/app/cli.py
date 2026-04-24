@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 
+from s2t_tool.shared.constants import Logger
 from s2t_tool.app.bootstrap import build_container
 
 
@@ -11,7 +12,7 @@ def handle_get(
     branch_arg: str | None,
     version_arg: str | None,
     diff_commit_arg: str | None,
-    logger=None,
+    logger: Logger | None = None,
 ) -> None:
     operations.run_get(
         product_name=product_name,
@@ -31,7 +32,7 @@ def handle_put(
     format_sql: bool,
     excel_arg: str | None,
     commit_message_arg: str | None,
-    logger=None,
+    logger: Logger | None = None,
 ) -> None:
     operations.run_put(
         product_name=product_name,

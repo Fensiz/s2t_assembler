@@ -40,21 +40,21 @@ class S2TView:
         self.keep_version_var = tk.BooleanVar(value=False)
         self.format_sql_var = tk.BooleanVar(value=False)
 
-        self.product_entry: tk.Entry | None = None
-        self.branch_entry: tk.Entry | None = None
-        self.commit_message_entry: tk.Entry | None = None
-        self.version_entry: tk.Entry | None = None
-        self.diff_commit_entry: tk.Entry | None = None
+        self.product_entry: tk.Entry
+        self.branch_entry: tk.Entry
+        self.commit_message_entry: tk.Entry
+        self.version_entry: tk.Entry
+        self.diff_commit_entry: tk.Entry
 
-        self.recent_listbox: tk.Listbox | None = None
-        self.status_text: tk.Text | None = None
+        self.recent_listbox: tk.Listbox
+        self.status_text: tk.Text
 
-        self.get_button: tk.Button | None = None
-        self.put_button: tk.Button | None = None
-        self.open_folder_button: tk.Button | None = None
+        self.get_button: tk.Button
+        self.put_button: tk.Button
+        self.open_folder_button: tk.Button
 
-        self.version_container: tk.Frame | None = None
-        self.version_label: tk.Label | None = None
+        self.version_container: tk.Frame
+        self.version_label: tk.Label
 
         self._build_fonts()
         self.build()
@@ -375,12 +375,6 @@ class S2TView:
         on_recent_select: Callable[[Any], None],
         on_version_click: Callable[[Any], None] | None = None,
     ) -> None:
-        assert self.get_button is not None
-        assert self.put_button is not None
-        assert self.open_folder_button is not None
-        assert self.recent_listbox is not None
-        assert self.version_label is not None
-
         self.get_button.config(command=on_get)
         self.put_button.config(command=on_put)
         self.open_folder_button.config(command=on_open_folder)
@@ -390,7 +384,6 @@ class S2TView:
             self.version_label.bind("<Button-1>", on_version_click)
 
     def set_status(self, message: str) -> None:
-        assert self.status_text is not None
         self.status_text.configure(state="normal")
         self.status_text.delete("1.0", tk.END)
         self.status_text.insert(tk.END, message)
@@ -398,7 +391,6 @@ class S2TView:
         self.status_text.configure(state="disabled")
 
     def append_status(self, message: str) -> None:
-        assert self.status_text is not None
         self.status_text.configure(state="normal")
         existing = self.status_text.get("1.0", "end-1c")
         if existing:
@@ -408,16 +400,11 @@ class S2TView:
         self.status_text.configure(state="disabled")
 
     def set_action_buttons_enabled(self, enabled: bool) -> None:
-        assert self.get_button is not None
-        assert self.put_button is not None
         state = "normal" if enabled else "disabled"
         self.get_button.config(state=state)
         self.put_button.config(state=state)
 
     def set_update_available(self, available: bool, latest_version: str | None = None) -> None:
-        assert self.version_container is not None
-        assert self.version_label is not None
-
         if available:
             self.version_container.config(
                 highlightbackground=self.DANGER,
@@ -445,7 +432,6 @@ class S2TView:
             )
 
     def set_version_text(self, text: str) -> None:
-        assert self.version_label is not None
         self.version_label.config(text=text)
 
     def fill_recent_items(
@@ -453,15 +439,11 @@ class S2TView:
         items: list[dict[str, str]],
         label_builder: Callable[[dict[str, str]], str],
     ) -> None:
-        assert self.recent_listbox is not None
         self.recent_listbox.delete(0, tk.END)
         for item in items:
             self.recent_listbox.insert(tk.END, label_builder(item))
 
     def read_get_request(self) -> GetRequest:
-        assert self.product_entry is not None
-        assert self.branch_entry is not None
-        assert self.diff_commit_entry is not None
         return GetRequest(
             product_name=self.product_entry.get().strip(),
             branch=self._resolve_branch_value(self.branch_entry.get()),
@@ -470,10 +452,6 @@ class S2TView:
         )
 
     def read_put_request(self) -> PutRequest:
-        assert self.product_entry is not None
-        assert self.branch_entry is not None
-        assert self.commit_message_entry is not None
-        assert self.version_entry is not None
         return PutRequest(
             product_name=self.product_entry.get().strip(),
             branch=self._resolve_branch_value(self.branch_entry.get()),
@@ -484,11 +462,6 @@ class S2TView:
         )
 
     def fill_form_from_recent_item(self, item: dict[str, str]) -> None:
-        assert self.product_entry is not None
-        assert self.branch_entry is not None
-        assert self.commit_message_entry is not None
-        assert self.version_entry is not None
-
         self.product_entry.delete(0, tk.END)
         self.product_entry.insert(0, item.get("product_name", ""))
 

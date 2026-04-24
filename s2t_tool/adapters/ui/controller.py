@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import tkinter as tk
 from pathlib import Path
 from s2t_tool.app.bootstrap import AppContainer
@@ -12,6 +13,10 @@ from s2t_tool.adapters.system.os_runtime import (
 from s2t_tool.adapters.ui.form_models import GetRequest, PutRequest
 from s2t_tool.adapters.ui.i18n import detect_language, localize_runtime_message, tr
 from s2t_tool.adapters.ui.view import S2TView
+
+
+_PRODUCT_NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+_VERSION_RE = re.compile(r"^\d+(\.\d+)*$")
 
 
 class S2TController:
@@ -88,7 +93,6 @@ class S2TController:
         self.view.fill_recent_items(recent.items, lambda item: f"{item.product_name} [{item.branch}]" if item.branch else item.product_name)
 
     def _on_recent_select(self, event) -> None:
-        assert self.view.recent_listbox is not None
         selection = self.view.recent_listbox.curselection()
         if not selection:
             return
@@ -104,11 +108,23 @@ class S2TController:
         if not request.product_name:
             self.view.show_error(self._t("error_title"), self._t("product_name_required"))
             return False
+        if not _PRODUCT_NAME_RE.fullmatch(request.product_name):
+            self.view.show_error(self._t("error_title"), self._t("product_name_invalid"))
+            return False
+        if request.version and not _VERSION_RE.fullmatch(request.version):
+            self.view.show_error(self._t("error_title"), self._t("version_invalid"))
+            return False
         return True
 
     def _validate_put_request(self, request: PutRequest) -> bool:
         if not request.product_name:
             self.view.show_error(self._t("error_title"), self._t("product_name_required"))
+            return False
+        if not _PRODUCT_NAME_RE.fullmatch(request.product_name):
+            self.view.show_error(self._t("error_title"), self._t("product_name_invalid"))
+            return False
+        if request.version and not _VERSION_RE.fullmatch(request.version):
+            self.view.show_error(self._t("error_title"), self._t("version_invalid"))
             return False
         if is_commit_ref(request.branch):
             self.view.show_error(self._t("error_title"), self._t("put_requires_branch"))

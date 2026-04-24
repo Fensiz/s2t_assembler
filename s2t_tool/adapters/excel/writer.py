@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from s2t_tool.shared.constants import Logger
+
 from openpyxl import Workbook
 
 from s2t_tool.adapters.excel.writers import (
@@ -231,7 +233,7 @@ def build_excel_from_repo(
     config_path: str = WRITER_CONFIG_FILE,
     diff_repo_dir: str | None = None,
     diff_commit: str | None = None,
-    logger=None,
+    logger: Logger | None = None,
 ) -> None:
     RepoExcelWriter(
         repo_dir=repo_dir,
@@ -252,7 +254,7 @@ class RepoExcelWriter:
         config_path: str | Path = WRITER_CONFIG_FILE,
         diff_repo_dir: str | Path | None = None,
         diff_commit: str | None = None,
-        logger=None,
+        logger: Logger | None = None,
         schema: S2TSchema = DEFAULT_SCHEMA,
     ) -> None:
         self.repo_dir = Path(repo_dir)

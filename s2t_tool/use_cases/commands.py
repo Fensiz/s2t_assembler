@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from s2t_tool.shared.constants import Logger
+
 
 @dataclass
 class GetCommand:
@@ -9,7 +11,7 @@ class GetCommand:
     branch_arg: str | None
     version_arg: str | None
     diff_commit_arg: str | None
-    logger: object | None = None
+    logger: Logger | None = None
 
 
 @dataclass
@@ -21,4 +23,4 @@ class PutCommand:
     format_sql: bool
     excel_arg: str | None
     commit_message_arg: str | None
-    logger: object | None = None
+    logger: Logger | None = None

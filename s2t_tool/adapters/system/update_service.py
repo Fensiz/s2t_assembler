@@ -8,10 +8,11 @@ from pathlib import Path
 from typing import Any
 
 from s2t_tool.app_info import APP_VERSION
+from s2t_tool.shared.constants import Logger
 
 
 class UpdateService:
-    def __init__(self, config: dict[str, Any], logger=None) -> None:
+    def __init__(self, config: dict[str, Any], logger: Logger | None = None) -> None:
         self.config = config
         self.logger = logger
 

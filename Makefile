@@ -32,6 +32,7 @@ prepare:
 
 	rsync -av \
 		--exclude='__pycache__/' \
+		--exclude='.DS_Store' \
 		s2t_tool/ \
 		$(STAGING_DIR)/s2t_tool/
 

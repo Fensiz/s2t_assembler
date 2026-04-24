@@ -4,13 +4,15 @@ import importlib
 import subprocess
 import sys
 
+from s2t_tool.shared.constants import Logger
+
 
 REQUIRED_PACKAGES = {
     "openpyxl": "openpyxl",
 }
 
 
-def ensure_dependencies(logger=None) -> None:
+def ensure_dependencies(logger: Logger | None = None) -> None:
     """
     Ensure required Python packages are installed.
     """
@@ -41,7 +43,7 @@ def _module_exists(name: str) -> bool:
         return False
 
 
-def _log(logger, message: str) -> None:
+def _log(logger: Logger | None, message: str) -> None:
     if logger:
         logger(message)
     else:

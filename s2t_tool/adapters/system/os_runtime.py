@@ -8,6 +8,8 @@ import shutil
 from pathlib import Path
 from typing import Callable
 
+from s2t_tool.shared.constants import Logger
+
 
 def open_file_in_os(path: Path) -> None:
     if not path.exists():
@@ -47,7 +49,7 @@ def resolve_python_executable() -> str:
     )
 
 
-def launch_app_detached(app_path: Path, logger=None) -> list[str]:
+def launch_app_detached(app_path: Path, logger: Logger | None = None) -> list[str]:
     command = [resolve_python_executable(), str(app_path)]
     if logger:
         logger(f"Launching updated app: {' '.join(command)}")

@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Protocol
 
+from s2t_tool.shared.constants import Logger
 from s2t_tool.use_cases.results import RecentItem
 from s2t_tool.use_cases.settings import AppConfig
 
@@ -16,11 +17,11 @@ class PathResolver(Protocol):
 
 
 class RepositoryGateway(Protocol):
-    def ensure_repo(self, repo_url: str, repo_dir: Path, branch: str, base_branch: str, logger=None) -> None: ...
+    def ensure_repo(self, repo_url: str, repo_dir: Path, branch: str, base_branch: str, logger: Logger | None = None) -> None: ...
     def export_tree(self, repo_dir: Path, ref: str, target_dir: Path) -> None: ...
     def replace_contents(self, path: Path, replacement_dir: Path, preserved_names: set[str] | None = None) -> None: ...
     def has_changes_excluding(self, repo_dir: Path, excluded_paths: list[Path]) -> bool: ...
-    def commit_and_push(self, repo_dir: Path, branch: str, message: str, logger=None) -> None: ...
+    def commit_and_push(self, repo_dir: Path, branch: str, message: str, logger: Logger | None = None) -> None: ...
 
 
 class ExcelGateway(Protocol):
@@ -31,7 +32,7 @@ class ExcelGateway(Protocol):
         writer_config: str,
         diff_repo_dir: Path | None,
         diff_ref: str | None,
-        logger=None,
+        logger: Logger | None = None,
     ) -> None: ...
 
     def export_excel_to_repo(
@@ -39,7 +40,7 @@ class ExcelGateway(Protocol):
         excel_path: Path,
         output_dir: Path,
         format_sql: bool,
-        logger=None,
+        logger: Logger | None = None,
     ) -> None: ...
 
 
