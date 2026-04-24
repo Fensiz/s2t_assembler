@@ -11,3 +11,4 @@ tests/__pycache__/
 S2T_USL_*.xlsx
 USL_S2T_*.xlsx
 .DS_Store
+.claude/
