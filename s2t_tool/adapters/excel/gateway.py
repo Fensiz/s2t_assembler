@@ -4,8 +4,6 @@ from pathlib import Path
 
 from s2t_tool.shared.constants import Logger
 from s2t_tool.use_cases.ports import ExcelGateway
-from s2t_tool.adapters.excel.reader import export_excel_to_repo
-from s2t_tool.adapters.excel.writer import build_excel_from_repo
 
 
 class OpenpyxlExcelAdapter(ExcelGateway):
@@ -18,6 +16,8 @@ class OpenpyxlExcelAdapter(ExcelGateway):
         diff_ref: str | None,
         logger: Logger | None = None,
     ) -> None:
+        from s2t_tool.adapters.excel.writer import build_excel_from_repo
+
         build_excel_from_repo(
             repo_dir=str(repo_dir),
             output_excel_path=str(output_excel),
@@ -34,6 +34,8 @@ class OpenpyxlExcelAdapter(ExcelGateway):
         format_sql: bool,
         logger: Logger | None = None,
     ) -> None:
+        from s2t_tool.adapters.excel.reader import export_excel_to_repo
+
         export_excel_to_repo(
             excel_path=str(excel_path),
             output_dir=str(output_dir),

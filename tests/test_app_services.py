@@ -149,6 +149,26 @@ class AppUpdateFlowServiceTests(unittest.TestCase):
         self.assertEqual(result, ["python3", "/tmp/app.pyz"])
         launcher.assert_called_once_with(Path("/tmp/app.pyz"), logger="logger")
 
+    def test_detect_running_app_delegates_to_runtime_helper(self) -> None:
+        lifecycle = Mock()
+        service = AppUpdateFlowService(lifecycle)
+
+        with patch("s2t_tool.app.update_flow.detect_running_app_path", return_value=Path("/tmp/app.pyz")) as detector:
+            result = service.detect_running_app()
+
+        self.assertEqual(result, Path("/tmp/app.pyz"))
+        detector.assert_called_once_with()
+
+    def test_adopt_external_app_delegates_and_sets_logger(self) -> None:
+        lifecycle = Mock()
+        lifecycle.update_service.adopt_external_app.return_value = Path("/tmp/current.pyz")
+
+        result = AppUpdateFlowService(lifecycle).adopt_external_app(Path("/tmp/app.pyz"), logger="logger")
+
+        self.assertEqual(result, Path("/tmp/current.pyz"))
+        self.assertEqual(lifecycle.update_service.logger, "logger")
+        lifecycle.update_service.adopt_external_app.assert_called_once_with(Path("/tmp/app.pyz"))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -55,3 +55,13 @@ def launch_app_detached(app_path: Path, logger: Logger | None = None) -> list[st
         logger(f"Launching updated app: {' '.join(command)}")
     subprocess.Popen(command, start_new_session=True, close_fds=True)
     return command
+
+
+def detect_running_app_path() -> Path | None:
+    argv0 = Path(sys.argv[0]).expanduser()
+    if argv0.suffix.lower() != ".pyz":
+        return None
+    try:
+        return argv0.resolve()
+    except OSError:
+        return argv0

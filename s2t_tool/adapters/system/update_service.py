@@ -98,6 +98,32 @@ class UpdateService:
         self._log("Update installed.")
         return self.current_link
 
+    def is_running_from_managed_location(self, app_path: Path | None) -> bool:
+        if app_path is None:
+            return True
+        if not self.current_link.exists():
+            return False
+        try:
+            return app_path.resolve() == self.current_link.resolve()
+        except OSError:
+            return app_path == self.current_link
+
+    def adopt_external_app(self, source_file: Path) -> Path:
+        if not source_file.exists():
+            raise RuntimeError(f"Application file not found: {source_file}")
+        if source_file.suffix.lower() != ".pyz":
+            raise RuntimeError(f"Unsupported application file: {source_file}")
+
+        installed_version_file = self._install_version(source_file, APP_VERSION)
+        self._update_current_pointer(installed_version_file)
+
+        if not self.is_windows:
+            self._ensure_launcher()
+
+        self._ensure_desktop_shortcut()
+        self._log(f"Managed application is ready: {self.current_link}")
+        return self.current_link
+
     # ---------------------------------------------------------
     # Internal: repo sync
     # ---------------------------------------------------------
@@ -117,17 +143,19 @@ class UpdateService:
         env["GIT_SSH_COMMAND"] = "ssh -o BatchMode=yes"
 
         self._log(f"Running: git {' '.join(args)}")
-
-        result = subprocess.run(
-            ["git"] + args,
-            cwd=cwd,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            env=env,
-            timeout=60,
-        )
+        try:
+            result = subprocess.run(
+                ["git"] + args,
+                cwd=cwd,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                env=env,
+                timeout=60,
+            )
+        except FileNotFoundError as exc:
+            raise RuntimeError("Git executable not found in PATH.") from exc
 
         stdout = result.stdout.strip()
         stderr = result.stderr.strip()

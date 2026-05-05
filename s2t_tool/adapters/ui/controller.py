@@ -37,6 +37,9 @@ class S2TController:
 
         self._fill_recent_items()
 
+        if not self._ensure_managed_runtime():
+            return
+
         try:
             self.container.lifecycle.initial_setup_service.logger = self._ui_logger
             self.container.lifecycle.ensure_initial_setup()
@@ -44,6 +47,25 @@ class S2TController:
             self.view.append_status(self._t("initial_setup_skipped", error=exc))
 
         self.root.after(1000, self._check_updates_on_start)
+
+    def _ensure_managed_runtime(self) -> bool:
+        app_path = self.container.update_flow.detect_running_app()
+        if self.container.update_flow.is_running_from_managed_location(app_path):
+            return True
+
+        assert app_path is not None
+        try:
+            self.view.show_info(self._t("update_title"), self._t("managed_runtime_notice"))
+            self.view.append_status(self._t("managed_runtime_status", path=app_path))
+            managed_app = self.container.update_flow.adopt_external_app(app_path, logger=self._ui_logger)
+            self.view.append_status(self._t("managed_runtime_ready", path=managed_app))
+            self._restart_with_updated_app(managed_app)
+            return False
+        except Exception as exc:
+            error_text = self._localize_runtime_message(exc)
+            self.view.show_error(self._t("update_title"), self._t("managed_runtime_failed", error=error_text))
+            self.view.append_status(self._t("managed_runtime_failed", error=error_text))
+            return True
 
     def _call_in_ui(self, fn) -> None:
         self.root.after(0, fn)
